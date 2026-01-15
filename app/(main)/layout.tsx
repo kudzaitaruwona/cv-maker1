@@ -4,24 +4,28 @@ import { ReactNode } from "react";
 export default function SharedLayout({children}: {children:ReactNode}){
 
     return(
-        <main>
+        <main className="min-h-screen flex flex-col">
             <Navbar/>
-            <div className="flex-1 flex flex-col gap-20 max-w-5xl p-5 ">
+            <div className="flex-1 flex flex-col gap-20 max-w-5xl mx-auto px-5 w-full">
                 {children}
             </div>
-            <footer className="w-full flex items-center justify-center border-t mx-auto text-center text-xs gap-8 py-16">
-          <p>
-            Powered by{" "}
-            <a
-              href="https://supabase.com/?utm_source=create-next-app&utm_medium=template&utm_term=nextjs"
-              target="_blank"
-              className="font-bold hover:underline"
-              rel="noreferrer"
-            >
-              Supabase
-            </a>
-          </p>
-        </footer>
+            <footer className="border-t py-8 mt-auto">
+              <div className="max-w-5xl mx-auto px-5">
+                <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+                  <div>
+                    <h3 className="text-xl font-bold">
+                      CV<span className="text-blue-500">Maker</span>
+                    </h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Your professional achievement manager
+                    </p>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    © {new Date().getFullYear()} Highlights. MIT License.
+                  </p>
+                </div>
+              </div>
+            </footer> 
         </main>
     )
 }

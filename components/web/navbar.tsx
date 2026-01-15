@@ -55,7 +55,7 @@ export function Navbar() {
 
   return (
     <nav className="w-full border-b">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-6">
+      <div className="max-w-5xl mx-auto px-5">
         <div className="flex h-16 items-center justify-between">
           <div className="flex items-center gap-6 lg:gap-8">
             <Link href="/">
