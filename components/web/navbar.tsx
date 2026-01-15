@@ -7,12 +7,41 @@ import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/context/AuthContext"
+import { useEffect, useState } from "react"
+import { useProfile } from "@/context/ProfileContext"
+
 
 const supabase = createClient()
 
 export function Navbar() {
-  const { user } = useAuth()
-  const router = useRouter()
+  const { user } = useAuth();
+  const { profile } = useProfile()
+  const userId = user?.id;
+  const router = useRouter();
+  const [data, setData] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+      useEffect(() => {
+          if (!userId) return;
+  
+          const fetchProfile = async () => {
+              const { data, error } = await supabase
+                  .from('Profile')
+                  .select()
+                  .eq("user_id", userId)
+                  .single();
+                  
+              if (error) {
+                  toast.error(error.message);
+                  return;
+              }
+              
+              setData(data);
+          };
+          
+          // Call the async function
+          fetchProfile();
+      }, [userId]);
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut()
@@ -47,9 +76,13 @@ export function Navbar() {
       </div>
 
       <div className="flex items-center gap-2">
-        {user ? (
+       {user ? (
           <div className="flex items-center gap-4">
-            Hey, {user.email}!
+            {!profile ? (
+              <span>Loading...</span>
+            ) :
+              (<span>Hey, {profile?.username}!</span>
+            ) }
             <Button onClick={handleLogout}>Logout</Button>
           </div>
         ) : (

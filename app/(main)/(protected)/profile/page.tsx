@@ -2,43 +2,26 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { User } from "@supabase/supabase-js";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
+import { set } from "react-hook-form";
+import { useProfile } from "@/context/ProfileContext";
 
-export default function profilePage(){
+export default function ProfilePage() {
     const supabase = createClient();
+    const userId = useAuth().user?.id;
+    const { profile } = useProfile()
+    const [data, setData] = useState<any>(null);
 
-    const [user, setUser] = useState<User| null>(null);
-    const [data, setData] = useState< any >(null)
-    const userId = user?.id;
-    
-      useEffect(() => {
-        const fetchUser = async () => {
-          const { data: { user } } = await supabase.auth.getUser()
-          setUser(user)
-        }
-        fetchUser()
-      }, []);
 
-      useEffect(() => {
-        const fetchProfile = async () => {
-            const { data, error } = await supabase
-                .from('Profile')
-                .select()
-                .eq("id", userId)
-                .single()
-            if (error) {
-                toast.error(error.message)
-                return
-            }
-      }})
-        
 
-    return(
+
+    return (
         <div>
-            <p>this is test data</p>
+            <p>This is test data and this is the user's id: {userId}</p>
+            {!profile ? (<div>Loading...</div>) : 
+                (<p>Data: {JSON.stringify(profile)}</p>)}
         </div>
-    )
+    );
 }
-
-
