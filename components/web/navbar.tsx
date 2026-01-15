@@ -6,21 +6,13 @@ import { ThemeSwitcher } from "../theme-switcher"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
-import { User } from "@supabase/supabase-js"
+import { useAuth } from "@/context/AuthContext"
+
+const supabase = createClient()
 
 export function Navbar() {
-  const supabase = createClient()
+  const { user } = useAuth()
   const router = useRouter()
-  const [user, setUser] = useState<User | null>(null)
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      setUser(user)
-    }
-    fetchUser()
-  }, [])
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut()
@@ -30,7 +22,6 @@ export function Navbar() {
     }
     toast.success("Logged out successfully")
     router.push("/")
-    setUser(null) // clear user state
   }
 
   return (
@@ -57,11 +48,10 @@ export function Navbar() {
 
       <div className="flex items-center gap-2">
         {user ? (
-            <div className="flex items-center gap-4">
-                  Hey, {user.email}!
-                  <Button onClick={handleLogout}>Logout</Button>
-            </div>
-          
+          <div className="flex items-center gap-4">
+            Hey, {user.email}!
+            <Button onClick={handleLogout}>Logout</Button>
+          </div>
         ) : (
           <>
             <Link className={buttonVariants()} href="/auth/sign-up">
