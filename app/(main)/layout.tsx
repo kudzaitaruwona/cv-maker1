@@ -21,7 +21,7 @@ export default function SharedLayout({children}: {children:ReactNode}){
                     </p>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    © {new Date().getFullYear()} ResuMe. MIT License.
+                    © 2026 ResuMe. MIT License.
                   </p>
                 </div>
               </div>

@@ -46,12 +46,13 @@ export function LoginForm({
         password,
       });
       if (error) throw error;
-      // Update this route to redirect to an authenticated route. The user already has an active session.
-      router.push("/protected");
-      toast.success("Logged in successfully")
+      
+      toast.success("Logged in successfully");
+      
+      // Navigate without setting loading to false to avoid state updates after unmount
+      router.replace("/protected");
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred");
-    } finally {
       setIsLoading(false);
     }
   };

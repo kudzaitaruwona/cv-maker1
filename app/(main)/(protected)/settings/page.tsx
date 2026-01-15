@@ -1,22 +1,94 @@
 "use client"
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useState, useEffect } from "react"
+import { useProfile } from "@/context/ProfileContext"
+import { useAuth } from "@/context/AuthContext"
+import { useForm } from "react-hook-form"
+import { toast } from "sonner"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { 
   User, 
   Bell, 
   Lock, 
-  Palette, 
   Trash2,
   Save,
-  Mail,
-  Shield
+  Shield,
+  Pencil,
+  X
 } from "lucide-react"
 
 export default function SettingsPage() {
+  const { profile, updateProfile } = useProfile()
+  const { user } = useAuth()
+  const [isEditing, setIsEditing] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+
+  const form = useForm({
+    defaultValues: profile || {},
+  })
+
+  useEffect(() => {
+    if (profile && !isEditing) {
+      form.reset(profile)
+    }
+  }, [profile, isEditing, form])
+
+  const handleEdit = () => {
+    if (profile) {
+      form.reset(profile)
+      setIsEditing(true)
+    }
+  }
+
+  const handleCancel = () => {
+    form.reset(profile || {})
+    setIsEditing(false)
+  }
+
+  const onSubmit = async (data: Record<string, any>) => {
+    if (!profile) return
+
+    setIsSaving(true)
+    try {
+      const updates: Record<string, any> = {}
+      
+      Object.keys(data).forEach((key) => {
+        if (key !== "user_id" && key !== "id" && key !== "created_at" && key !== "updated_at" && data[key] !== profile[key]) {
+          updates[key] = data[key]
+        }
+      })
+
+      if (Object.keys(updates).length === 0) {
+        toast.info("No changes to save")
+        setIsEditing(false)
+        setIsSaving(false)
+        return
+      }
+
+      const { error } = await updateProfile(updates)
+
+      if (error) {
+        toast.error(error.message || "Failed to update profile")
+      } else {
+        toast.success("Profile updated successfully")
+        setIsEditing(false)
+      }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An error occurred"
+      toast.error(errorMessage)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const profileFields = profile ? Object.keys(profile).filter(
+    (key) => key !== "id" && key !== "user_id" && key !== "created_at" && key !== "updated_at" && key !== "avatar_url"
+  ) : []
   return (
     <div className="container mx-auto py-8 max-w-4xl">
       <div className="mb-8">
@@ -30,39 +102,114 @@ export default function SettingsPage() {
         {/* Account Settings */}
         <Card>
           <CardHeader>
-            <div className="flex items-center gap-2">
-              <User className="h-5 w-5" />
-              <CardTitle>Account</CardTitle>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <User className="h-5 w-5" />
+                <CardTitle>Account</CardTitle>
+              </div>
+              {!isEditing && profile && (
+                <Button onClick={handleEdit} variant="outline" size="sm">
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Edit
+                </Button>
+              )}
             </div>
             <CardDescription>
               Update your account information
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="your@email.com"
-                disabled
-              />
-              <p className="text-xs text-muted-foreground">
-                Email cannot be changed
-              </p>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="username">Username</Label>
-              <Input
-                id="username"
-                type="text"
-                placeholder="username"
-              />
-            </div>
-            <Button>
-              <Save className="mr-2 h-4 w-4" />
-              Save Changes
-            </Button>
+          <CardContent>
+            {!profile ? (
+              <div className="text-center text-muted-foreground py-8">
+                Loading profile...
+              </div>
+            ) : (
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  {user?.email && (
+                    <div className="grid gap-2">
+                      <Label htmlFor="user-email">Email</Label>
+                      <Input
+                        id="user-email"
+                        type="email"
+                        value={user.email}
+                        disabled
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Email cannot be changed
+                      </p>
+                    </div>
+                  )}
+                  
+                  {profileFields.map((fieldName) => {
+                    const fieldValue = profile[fieldName]
+                    const displayName = fieldName
+                      .split("_")
+                      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+                      .join(" ")
+
+                    return (
+                      <FormField
+                        key={fieldName}
+                        control={form.control}
+                        name={fieldName}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{displayName}</FormLabel>
+                            <FormControl>
+                              {isEditing ? (
+                                <Input
+                                  {...field}
+                                  type={
+                                    fieldName.includes("email")
+                                      ? "email"
+                                      : fieldName.includes("phone")
+                                      ? "tel"
+                                      : fieldName.includes("date")
+                                      ? "date"
+                                      : "text"
+                                  }
+                                  disabled={isSaving}
+                                />
+                              ) : (
+                                <div className="flex h-9 w-full rounded-md border border-input bg-muted px-3 py-1 text-sm">
+                                  {fieldValue !== null && fieldValue !== undefined
+                                    ? String(fieldValue)
+                                    : "Not set"}
+                                </div>
+                              )}
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )
+                  })}
+
+                  {isEditing && (
+                    <CardFooter className="px-0 pt-4 flex gap-2">
+                      <Button
+                        type="submit"
+                        disabled={isSaving}
+                        className="flex-1"
+                      >
+                        <Save className="mr-2 h-4 w-4" />
+                        {isSaving ? "Saving..." : "Save Changes"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleCancel}
+                        disabled={isSaving}
+                      >
+                        <X className="mr-2 h-4 w-4" />
+                        Cancel
+                      </Button>
+                    </CardFooter>
+                  )}
+                </form>
+              </Form>
+            )}
           </CardContent>
         </Card>
 
@@ -144,32 +291,6 @@ export default function SettingsPage() {
               <Shield className="mr-2 h-4 w-4" />
               Update Password
             </Button>
-          </CardContent>
-        </Card>
-
-        {/* Appearance */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Palette className="h-5 w-5" />
-              <CardTitle>Appearance</CardTitle>
-            </div>
-            <CardDescription>
-              Customize the look and feel of the application
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label>Theme</Label>
-                <p className="text-sm text-muted-foreground">
-                  Choose between light and dark mode
-                </p>
-              </div>
-              <Button variant="outline" size="sm">
-                Configure
-              </Button>
-            </div>
           </CardContent>
         </Card>
 
