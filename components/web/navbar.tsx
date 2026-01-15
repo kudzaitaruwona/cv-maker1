@@ -54,51 +54,55 @@ export function Navbar() {
   }
 
   return (
-    <nav className="w-full py-5 flex items-center justify-between">
-      <div className="flex items-center gap-8">
-        <Link href="/">
-          <h1 className="text-3xl font-bold">
-            CV<span className="text-blue-500">Maker</span>
-          </h1>
-        </Link>
+    <nav className="w-full border-b">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-6">
+        <div className="flex h-16 items-center justify-between">
+          <div className="flex items-center gap-6 lg:gap-8">
+            <Link href="/">
+              <h1 className="text-3xl font-bold">
+                CV<span className="text-blue-500">Maker</span>
+              </h1>
+            </Link>
 
-        <div className="flex items-center gap-2">
-          <Link className={buttonVariants({ variant: "ghost" })} href="/dashboard">
-            Dashboard
-          </Link>
-          <Link className={buttonVariants({ variant: "ghost" })} href="/bullets">
-            Bullets
-          </Link>
-          <Link className={buttonVariants({ variant: "ghost" })} href="/cvs">
-            CVs
-          </Link>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-2">
-       {user ? (
-          <div className="flex items-center gap-4">
-            {!profile ? (
-              <span>Loading...</span>
-            ) :
-              (<span>Hey, {profile?.username}!</span>
-            ) }
-            <Button onClick={handleLogout}>Logout</Button>
+            <div className="flex items-center gap-1">
+              <Link className={buttonVariants({ variant: "ghost" })} href="/dashboard">
+                Dashboard
+              </Link>
+              <Link className={buttonVariants({ variant: "ghost" })} href="/bullets">
+                Bullets
+              </Link>
+              <Link className={buttonVariants({ variant: "ghost" })} href="/cvs">
+                CVs
+              </Link>
+            </div>
           </div>
-        ) : (
-          <>
-            <Link className={buttonVariants()} href="/auth/sign-up">
-              Sign Up
-            </Link>
-            <Link
-              className={buttonVariants({ variant: "secondary" })}
-              href="/auth/login"
-            >
-              Log in
-            </Link>
-          </>
-        )}
-        <ThemeSwitcher />
+
+          <div className="flex items-center gap-3">
+           {user ? (
+              <div className="flex items-center gap-3">
+                {!profile ? (
+                  <span className="text-sm text-muted-foreground">Loading...</span>
+                ) : (
+                  <span className="text-sm">Hey, {profile?.username}!</span>
+                )}
+                <Button onClick={handleLogout}>Logout</Button>
+              </div>
+            ) : (
+              <>
+                <Link className={buttonVariants()} href="/auth/sign-up">
+                  Sign Up
+                </Link>
+                <Link
+                  className={buttonVariants({ variant: "secondary" })}
+                  href="/auth/login"
+                >
+                  Log in
+                </Link>
+              </>
+            )}
+            <ThemeSwitcher />
+          </div>
+        </div>
       </div>
     </nav>
   )
