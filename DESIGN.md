@@ -26,6 +26,16 @@ Single source of truth for ResuMe's visual design language and UI principles.
 3. **Focus**: One primary action per screen
 4. **Feedback**: Clear states for all interactions
 5. **Progressive Disclosure**: Show only what's needed when it's needed
+6. **Personality**: Subtle visual interest that enhances without distracting
+
+### Visual Interest Patterns
+
+- **Gradient backgrounds**: Subtle gradients for depth and visual interest
+- **Radial patterns**: Ambient lighting effects for modern feel
+- **Hover interactions**: Cards lift slightly on hover for engagement
+- **Status indicators**: Animated badges for trust and status
+- **Enhanced typography**: Gradient text treatments for hero sections
+- **Section separation**: Border accents and background variations
 
 ## Color System
 
@@ -34,6 +44,13 @@ Single source of truth for ResuMe's visual design language and UI principles.
 - **Background**: Neutral base (white/very dark gray)
 - **Foreground**: High contrast text (near black/white)
 - **Border**: Subtle separation (light gray/dark gray)
+
+### Background Patterns
+
+- **Gradient overlays**: `bg-gradient-to-b from-muted/20 via-background to-background` for subtle depth
+- **Radial gradients**: `bg-[radial-gradient(...)]` for ambient lighting effects
+- **Section backgrounds**: `bg-muted/30` for section separation
+- **Border accents**: `border-border/50` for subtle section dividers
 
 ### Semantic Colors
 
@@ -76,13 +93,20 @@ Single source of truth for ResuMe's visual design language and UI principles.
 
 ### Scale
 
-- **Display**: `text-5xl` to `text-6xl` (48px-60px) - Hero headings only
-- **H1**: `text-3xl` (30px) - Page titles
-- **H2**: `text-2xl` (24px) - Section headings
-- **H3**: `text-xl` (20px) - Subsection headings
-- **Body**: `text-base` (16px) - Default text
+- **Display**: `text-5xl` to `text-7xl` (48px-72px) - Hero headings only
+- **H1**: `text-3xl` to `text-5xl` (30px-48px) - Page titles
+- **H2**: `text-2xl` to `text-4xl` (24px-36px) - Section headings
+- **H3**: `text-xl` to `text-2xl` (20px-24px) - Subsection headings
+- **Body**: `text-base` to `text-xl` (16px-20px) - Default text, larger for hero
 - **Small**: `text-sm` (14px) - Secondary text, descriptions
 - **XS**: `text-xs` (12px) - Labels, metadata
+
+### Typography Enhancements
+
+- **Hero text**: Use larger sizes (`text-7xl` for hero, `text-5xl` for tagline)
+- **Gradient text**: `bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent` for hero titles
+- **Line height**: `leading-relaxed` for body text, default for headings
+- **Letter spacing**: `tracking-tight` for large headings
 
 ### Usage
 
@@ -131,6 +155,14 @@ Single source of truth for ResuMe's visual design language and UI principles.
 
 ## Component Guidelines
 
+### Badges & Status Indicators
+
+**Badge Pattern:**
+- Container: `inline-flex items-center gap-2 px-4 py-2 rounded-full bg-muted/50 border border-border/50`
+- Animated indicator: Pulsing dot with `animate-ping` for status
+- Usage: Trust indicators, status messages, feature highlights
+- Text: `text-sm text-muted-foreground`
+
 ### Buttons
 
 **Variants:**
@@ -153,6 +185,8 @@ Single source of truth for ResuMe's visual design language and UI principles.
 - Use `outline` or `ghost` for secondary actions
 - Disabled state: `opacity-50` + `disabled:pointer-events-none`
 - Always include focus-visible ring
+- Enhanced CTAs: Add `shadow-lg hover:shadow-xl` for primary actions
+- Border: Use `border-2` for outline buttons for better definition
 
 ### Forms
 
@@ -181,16 +215,23 @@ Single source of truth for ResuMe's visual design language and UI principles.
 ### Cards
 
 **Structure:**
-- Container: `rounded-xl border bg-card shadow`
+- Container: `rounded-xl border-2 bg-card shadow`
 - Header: `p-6` with `space-y-1.5` for title/description
 - Content: `p-6 pt-0` (no top padding when header exists)
 - Footer: `p-6 pt-0` for actions
+
+**Interactive Cards:**
+- Add `group` class for hover effects
+- Use `hover:shadow-lg transition-all duration-300 hover:-translate-y-1`
+- Icon containers: `group-hover:bg-primary/20` for visual feedback
+- Border: `border-2` for more defined edges
 
 **Usage:**
 - Group related content
 - One primary card per section
 - Use shadows for depth
 - Maintain consistent padding
+- Add hover effects for interactive cards
 
 ### Tables
 
@@ -220,17 +261,38 @@ Single source of truth for ResuMe's visual design language and UI principles.
 
 ## Shadows
 
-- **Cards**: `shadow` (default)
-- **Buttons**: `shadow-sm` (small)
+- **Cards**: `shadow` (default), `hover:shadow-lg` for interactive cards
+- **Buttons**: `shadow-sm` (small), `shadow-lg` for primary CTAs
 - **Elevated**: `shadow-md` (modals, dropdowns)
+- **Hover states**: `hover:shadow-xl` for enhanced feedback
 - **No shadow**: Ghost buttons, subtle elements
 
-## Transitions
+### Shadow Usage
 
-- **Duration**: Default (150ms-200ms)
-- **Properties**: `transition-colors` for color changes
+- Use shadows to indicate interactivity
+- Enhance shadows on hover for cards and buttons
+- Maintain consistency: same shadow level for similar elements
+
+## Transitions & Animations
+
+- **Duration**: Default (150ms-300ms)
+- **Properties**: 
+  - `transition-colors` for color changes
+  - `transition-all` for multiple properties
+  - `transition-shadow` for shadow changes
 - **Easing**: Default (ease-in-out)
 - **Hover**: Immediate feedback, no delay
+- **Subtle animations**: Use sparingly for engagement
+  - Card hover: `hover:-translate-y-1` (4px lift)
+  - Shadow enhancement: `hover:shadow-lg` to `hover:shadow-xl`
+  - Icon background: `group-hover:bg-primary/20` for interactive feedback
+
+### Animation Guidelines
+
+- Keep animations subtle and purposeful
+- Use for hover states and micro-interactions
+- Avoid animations that distract from content
+- Test for performance on lower-end devices
 
 ## Do's and Don'ts
 

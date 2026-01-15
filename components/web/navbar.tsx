@@ -51,6 +51,7 @@ export function Navbar() {
     }
     toast.success("Logged out successfully")
     router.push("/")
+    router.refresh()
   }
 
   return (
@@ -74,6 +75,11 @@ export function Navbar() {
               <Link className={buttonVariants({ variant: "ghost" })} href="/cvs">
                 CVs
               </Link>
+              {user && (
+                <Link className={buttonVariants({ variant: "ghost" })} href="/settings">
+                  Settings
+                </Link>
+              )}
             </div>
           </div>
 
