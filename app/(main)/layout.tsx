@@ -14,14 +14,14 @@ export default function SharedLayout({children}: {children:ReactNode}){
                 <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                   <div>
                     <h3 className="text-xl font-bold">
-                      CV<span className="text-blue-500">Maker</span>
+                      Resu<span className="text-blue-500">Me</span>
                     </h3>
                     <p className="text-sm text-muted-foreground mt-1">
                       Your professional achievement manager
                     </p>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    © {new Date().getFullYear()} Highlights. MIT License.
+                    © {new Date().getFullYear()} ResuMe. MIT License.
                   </p>
                 </div>
               </div>

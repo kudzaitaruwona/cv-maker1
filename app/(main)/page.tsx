@@ -20,7 +20,7 @@ export default function Home() {
         <section className="py-20 lg:py-32">
           <div className="text-center max-w-4xl mx-auto">
             <h1 className="text-5xl lg:text-6xl font-bold tracking-tight mb-6">
-              Highlights
+              ResuMe
               <span className="block text-3xl lg:text-4xl text-muted-foreground mt-2">
                 CV & Achievement Manager
               </span>
@@ -50,7 +50,9 @@ export default function Home() {
             <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
               <Card>
                 <CardHeader>
-                  <GraduationCap className="h-10 w-10 mb-2 text-blue-500" />
+                  <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center mb-2">
+                    <GraduationCap className="h-6 w-6 text-primary" />
+                  </div>
                   <CardTitle>Students</CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -61,7 +63,9 @@ export default function Home() {
               </Card>
               <Card>
                 <CardHeader>
-                  <Code className="h-10 w-10 mb-2 text-green-500" />
+                  <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center mb-2">
+                    <Code className="h-6 w-6 text-primary" />
+                  </div>
                   <CardTitle>Freelancers</CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -72,7 +76,9 @@ export default function Home() {
               </Card>
               <Card>
                 <CardHeader>
-                  <Briefcase className="h-10 w-10 mb-2 text-purple-500" />
+                  <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center mb-2">
+                    <Briefcase className="h-6 w-6 text-primary" />
+                  </div>
                   <CardTitle>Professionals</CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -221,7 +227,7 @@ export default function Home() {
               Ready to Get Started?
             </h2>
             <p className="text-xl mb-8 text-primary-foreground/90 max-w-2xl mx-auto">
-              Join Highlights today and take control of your professional achievements
+              Join ResuMe today and take control of your professional achievements
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button asChild size="lg" variant="secondary" className="text-lg px-8">
