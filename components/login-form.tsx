@@ -50,7 +50,7 @@ export function LoginForm({
       toast.success("Logged in successfully");
       
       // Navigate without setting loading to false to avoid state updates after unmount
-      router.replace("/protected");
+      router.replace("/dashboard");
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred");
       setIsLoading(false);

@@ -1,139 +1,87 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { PlusCircle } from "lucide-react"
+import { PlusCircle, Loader2, RefreshCw } from "lucide-react"
+import { getBullets, deleteBullets } from "@/app/actions/bullets"
+import { toast } from "sonner"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 interface Bullet {
   id: string
   content: string
-  category: "experience" | "projects" | "education" | "skills" | "certifications" | "other"
+  category: "Experience" | "Projects" | "Education" | "Skills" | "Certifications" | "Other"
   createdAt: string
+  title?: string
 }
 
 const categories: Bullet["category"][] = [
-  "experience",
-  "projects",
-  "education",
-  "skills",
-  "certifications",
-  "other"
+  "Experience",
+  "Projects",
+  "Education",
+  "Skills",
+  "Certifications",
+  "Other"
 ]
 
 export default function BulletsPage() {
-  // TODO: Replace with actual API call to fetch bullets from backend
-  const [bullets] = useState<Bullet[]>([
-    {
-      id: "1",
-      content: "Developed and maintained web applications using React and TypeScript",
-      category: "experience",
-      createdAt: "2024-01-15"
-    },
-    {
-      id: "2",
-      content: "Led a team of 5 developers to deliver a major product feature on time",
-      category: "experience",
-      createdAt: "2024-03-01"
-    },
-    {
-      id: "3",
-      content: "Implemented CI/CD pipelines reducing deployment time by 40%",
-      category: "experience",
-      createdAt: "2024-02-20"
-    },
-    {
-      id: "4",
-      content: "Built a task management app with real-time collaboration features",
-      category: "projects",
-      createdAt: "2024-02-10"
-    },
-    {
-      id: "5",
-      content: "Developed an e-commerce platform with payment integration",
-      category: "projects",
-      createdAt: "2023-12-05"
-    },
-    {
-      id: "6",
-      content: "Created a data visualization dashboard using D3.js and React",
-      category: "projects",
-      createdAt: "2024-01-25"
-    },
-    {
-      id: "7",
-      content: "Bachelor of Science in Computer Science, University of Technology",
-      category: "education",
-      createdAt: "2023-06-20"
-    },
-    {
-      id: "8",
-      content: "Master of Science in Software Engineering, Tech Institute",
-      category: "education",
-      createdAt: "2021-05-15"
-    },
-    {
-      id: "9",
-      content: "Relevant coursework: Data Structures, Algorithms, Software Engineering",
-      category: "education",
-      createdAt: "2023-08-10"
-    },
-    {
-      id: "10",
-      content: "Programming Languages: JavaScript, TypeScript, Python, Java",
-      category: "skills",
-      createdAt: "2024-01-01"
-    },
-    {
-      id: "11",
-      content: "Frameworks: React, Next.js, Node.js, Express",
-      category: "skills",
-      createdAt: "2024-01-02"
-    },
-    {
-      id: "12",
-      content: "Tools: Git, Docker, AWS, Kubernetes",
-      category: "skills",
-      createdAt: "2024-01-03"
-    },
-    {
-      id: "13",
-      content: "AWS Certified Solutions Architect - Associate",
-      category: "certifications",
-      createdAt: "2023-11-05"
-    },
-    {
-      id: "14",
-      content: "Google Cloud Professional Cloud Architect",
-      category: "certifications",
-      createdAt: "2024-02-15"
-    },
-    {
-      id: "15",
-      content: "Certified Kubernetes Administrator (CKA)",
-      category: "certifications",
-      createdAt: "2023-09-20"
-    },
-    {
-      id: "16",
-      content: "Volunteer mentor for coding bootcamp students",
-      category: "other",
-      createdAt: "2024-03-10"
-    },
-    {
-      id: "17",
-      content: "Open source contributor to multiple React libraries",
-      category: "other",
-      createdAt: "2023-12-01"
-    },
-    {
-      id: "18",
-      content: "Published technical blog posts on software architecture",
-      category: "other",
-      createdAt: "2024-01-30"
+  const [bullets, setBullets] = useState<Bullet[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [bulletToDelete, setBulletToDelete] = useState<Bullet | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+    
+  const fetchBullets = async () => {
+    setIsLoading(true)
+    try {
+      const data = await getBullets()
+      setBullets(data || [])
+    } catch (error) {
+      console.error("Failed to fetch bullets:", error)
+      toast.error("Failed to load bullets. Please try again.")
+    } finally {
+      setIsLoading(false)
     }
-  ])
+  }
+
+  useEffect(() => {
+    fetchBullets()
+  }, [])
+
+  const handleDeleteClick = (bullet: Bullet) => {
+    setBulletToDelete(bullet)
+    setDeleteDialogOpen(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!bulletToDelete) return
+
+    setIsDeleting(true)
+    try {
+      await deleteBullets(bulletToDelete.id)
+      toast.success("Bullet deleted successfully")
+      setDeleteDialogOpen(false)
+      setBulletToDelete(null)
+      // Refresh the list after deletion
+      await fetchBullets()
+    } catch (error) {
+      console.error("Failed to delete bullet:", error)
+      toast.error("Failed to delete bullet. Please try again.")
+    } finally {
+      setIsDeleting(false)
+    }
+  }
 
   const groupedBullets = useMemo(() => {
     const grouped: Record<string, Bullet[]> = {}
@@ -158,15 +106,33 @@ export default function BulletsPage() {
             Manage your achievement bullets
           </p>
         </div>
-        <Button asChild>
-          <Link href="/bullets/new">
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Add Bullet
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            size="icon"
+            onClick={fetchBullets}
+            disabled={isLoading}
+          >
+            <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+            <span className="sr-only">Refresh</span>
+          </Button>
+          <Button asChild>
+            <Link href="/bullets/new">
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Add Bullet
+            </Link>
+          </Button>
+        </div>
       </div>
 
-      {!hasAnyBullets ? (
+      {isLoading ? (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <Loader2 className="h-6 w-6 animate-spin mx-auto mb-4 text-muted-foreground" />
+            <p className="text-muted-foreground">Loading bullets...</p>
+          </CardContent>
+        </Card>
+      ) : !hasAnyBullets ? (
         <Card>
           <CardContent className="py-12 text-center">
             <p className="text-muted-foreground mb-4">No bullets yet</p>
@@ -194,8 +160,13 @@ export default function BulletsPage() {
                     <Card key={bullet.id}>
                       <CardHeader>
                         <CardTitle className="text-base font-medium">
-                          {bullet.content}
+                          {bullet.title || bullet.content}
                         </CardTitle>
+                        {bullet.title && (
+                          <CardDescription className="text-sm">
+                            {bullet.content}
+                          </CardDescription>
+                        )}
                         <CardDescription>
                           Added on {new Date(bullet.createdAt).toLocaleDateString()}
                         </CardDescription>
@@ -208,10 +179,7 @@ export default function BulletsPage() {
                           <Button 
                             variant="ghost" 
                             size="sm"
-                            onClick={() => {
-                              // TODO: Implement delete functionality with backend API
-                              console.log("Delete bullet:", bullet.id)
-                            }}
+                            onClick={() => handleDeleteClick(bullet)}
                           >
                             Delete
                           </Button>
@@ -225,6 +193,33 @@ export default function BulletsPage() {
           })}
         </div>
       )}
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the bullet{" "}
+              {bulletToDelete && (
+                <span className="font-medium">
+                  "{bulletToDelete.title || bulletToDelete.content}"
+                </span>
+              )}{" "}
+              from your account.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

@@ -24,7 +24,6 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
 
   const fetchProfile = async () => {
     if (!user) {
-      setProfile(null)
       return
     }
 
