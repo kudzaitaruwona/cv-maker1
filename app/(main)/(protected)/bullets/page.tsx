@@ -3,6 +3,12 @@
 import { useState, useMemo, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
 import Link from "next/link"
 import { PlusCircle, Loader2, RefreshCw } from "lucide-react"
 import { getBullets, deleteBullets } from "@/app/actions/bullets"
@@ -22,7 +28,8 @@ interface Bullet {
   id: string
   content: string
   category: "Experience" | "Projects" | "Education" | "Skills" | "Certifications" | "Other"
-  createdAt: string
+  createdAt?: string
+  created_at?: string
   title?: string
 }
 
@@ -95,6 +102,39 @@ export default function BulletsPage() {
     return category.charAt(0).toUpperCase() + category.slice(1)
   }
 
+  const formatDate = (dateString: string | undefined | null): string => {
+    if (!dateString) {
+      return "Date not available"
+    }
+    
+    try {
+      // Handle Supabase timestamp format: 2026-01-19 21:25:55.211563+00
+      // Replace space with 'T' to make it ISO 8601 compatible if needed
+      let dateStr = dateString.trim()
+      
+      // If it's in format "2026-01-19 21:25:55.211563+00", convert to ISO format
+      if (dateStr.includes(" ") && !dateStr.includes("T")) {
+        dateStr = dateStr.replace(" ", "T")
+      }
+      
+      const date = new Date(dateStr)
+      
+      if (isNaN(date.getTime())) {
+        console.error("Invalid date string:", dateString)
+        return "Invalid date"
+      }
+      
+      return date.toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      })
+    } catch (error) {
+      console.error("Error formatting date:", error, "Date string:", dateString)
+      return "Invalid date"
+    }
+  }
+
   const hasAnyBullets = bullets.length > 0
 
   return (
@@ -145,53 +185,64 @@ export default function BulletsPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-8">
+        <Accordion type="multiple" className="space-y-6">
           {categories.map((category) => {
             const categoryBullets = groupedBullets[category]
             if (categoryBullets.length === 0) return null
 
             return (
-              <div key={category} className="space-y-4">
-                <h2 className="text-2xl font-semibold">
-                  {formatCategoryName(category)}
-                </h2>
-                <div className="space-y-4">
-                  {categoryBullets.map((bullet) => (
-                    <Card key={bullet.id}>
-                      <CardHeader>
-                        <CardTitle className="text-base font-medium">
-                          {bullet.title || bullet.content}
-                        </CardTitle>
-                        {bullet.title && (
-                          <CardDescription className="text-sm">
-                            {bullet.content}
-                          </CardDescription>
-                        )}
-                        <CardDescription>
-                          Added on {new Date(bullet.createdAt).toLocaleDateString()}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm" asChild>
-                            <Link href={`/bullets/${bullet.id}/edit`}>Edit</Link>
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => handleDeleteClick(bullet)}
-                          >
-                            Delete
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
+              <AccordionItem key={category} value={category} className="border rounded-lg px-4 mb-4">
+                <AccordionTrigger className="text-2xl font-semibold hover:no-underline py-4">
+                  {formatCategoryName(category)} ({categoryBullets.length})
+                </AccordionTrigger>
+                <AccordionContent className="pt-4">
+                  <Accordion type="multiple" className="space-y-4">
+                    {categoryBullets.map((bullet) => (
+                      <AccordionItem
+                        key={bullet.id}
+                        value={bullet.id}
+                        className="border rounded-lg px-4"
+                      >
+                        <AccordionTrigger className="hover:no-underline">
+                          <span className="text-base font-medium text-left">
+                            {bullet.title || bullet.content}
+                          </span>
+                        </AccordionTrigger>
+                        <AccordionContent className="space-y-4 pb-4">
+                          {bullet.title && (
+                            <div className="space-y-2">
+                              <p className="text-sm font-medium text-muted-foreground">
+                                Content:
+                              </p>
+                              <p className="text-sm">{bullet.content}</p>
+                            </div>
+                          )}
+                          <div className="space-y-2">
+                            <p className="text-xs text-muted-foreground">
+                              Added on {formatDate(bullet.createdAt || bullet.created_at)}
+                            </p>
+                          </div>
+                          <div className="flex gap-2 pt-2">
+                            <Button variant="outline" size="sm" asChild>
+                              <Link href={`/bullets/${bullet.id}/edit`}>Edit</Link>
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteClick(bullet)}
+                            >
+                              Delete
+                            </Button>
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    ))}
+                  </Accordion>
+                </AccordionContent>
+              </AccordionItem>
             )
           })}
-        </div>
+        </Accordion>
       )}
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
