@@ -3,18 +3,24 @@
 import { createClient } from "@/lib/supabase/server";
 
 
+async function getAuthedContext() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) throw new Error("Not authenticated");
+
+  return { supabase, user };
+}
 
 export async function getProfile() {
-  const supabase = await createClient(); // reads session from cookies automatically
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const { supabase, user } = await getAuthedContext();
 
-  if (!user) throw new Error("User not signed in");
 
   const { data, error } = await supabase
     .from("Profile")
     .select("*")
     .eq("user_id", user.id)
-    .single();
+    .maybeSingle();
 
   if (error) throw error;
   return data;
@@ -23,10 +29,8 @@ export async function getProfile() {
 
 // UPDATE: update profile fields
 export async function updateProfile(userId: string, updates: Record<string, any>) {
-    const supabase = await createClient(); // reads session from cookies automatically
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const { supabase, user } = await getAuthedContext();
 
-  if (!user) throw new Error("User not signed in");
   
   const { data, error } = await supabase
     .from("Profile")
@@ -36,5 +40,41 @@ export async function updateProfile(userId: string, updates: Record<string, any>
     .single();
 
   if (error) throw error;
+  return data;
+}
+
+export async function checkUsername(username:string){
+const { supabase, user } = await getAuthedContext();
+
+
+  const { data, error } = await supabase
+    .from("Profile")
+    .select("*")
+    .eq("username", username)
+    .maybeSingle();
+
+  if (error) throw error;
+
+  if(data){
+    return false;
+} else{
+    return true
+}
+}
+
+export async function createProfile(profileData: Record<string, any>) {
+  const { supabase, user } = await getAuthedContext();
+
+  const { data, error } = await supabase
+    .from("Profile")
+    .insert({
+      user_id: user.id,
+      ...profileData,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+
   return data;
 }

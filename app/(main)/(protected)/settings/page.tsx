@@ -1,8 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useProfile } from "@/context/ProfileContext"
 import { useAuth } from "@/context/AuthContext"
+import { getProfile, updateProfile, createProfile, checkUsername } from "@/app/actions/profile"
 import { useForm } from "react-hook-form"
 import { toast } from "sonner"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
@@ -19,18 +19,51 @@ import {
   Save,
   Shield,
   Pencil,
-  X
+  X,
+  Loader2
 } from "lucide-react"
 
 export default function SettingsPage() {
-  const { profile, updateProfile } = useProfile()
   const { user } = useAuth()
+  const [profile, setProfile] = useState<any | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
 
   const form = useForm({
-    defaultValues: profile || {},
+    defaultValues: {} as Record<string, any>,
   })
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (!user) {
+        setIsLoading(false)
+        return
+      }
+      setIsLoading(true)
+      try {
+        const data = await getProfile()
+        setProfile(data)
+        if (data) {
+          form.reset(data)
+        } else {
+          // Set default form values for profile creation
+          form.reset({
+            first_name: "",
+            last_name: "",
+            username: "",
+          })
+        }
+      } catch (error) {
+        console.error("Failed to fetch profile:", error)
+        toast.error("Failed to load profile")
+        setProfile(null)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchProfile()
+  }, [user, form])
 
   useEffect(() => {
     if (profile && !isEditing) {
@@ -51,32 +84,86 @@ export default function SettingsPage() {
   }
 
   const onSubmit = async (data: Record<string, any>) => {
-    if (!profile) return
+    if (!user?.id) return
 
     setIsSaving(true)
     try {
-      const updates: Record<string, any> = {}
-      
+      // Filter out system fields
+      const cleanData: Record<string, any> = {}
       Object.keys(data).forEach((key) => {
-        if (key !== "user_id" && key !== "id" && key !== "created_at" && key !== "updated_at" && data[key] !== profile[key]) {
-          updates[key] = data[key]
+        if (
+          key !== "user_id" && 
+          key !== "id" && 
+          key !== "created_at" && 
+          key !== "updated_at" && 
+          key !== "avatar_url" &&
+          data[key] !== null &&
+          data[key] !== undefined &&
+          data[key] !== ""
+        ) {
+          cleanData[key] = data[key]
         }
       })
 
-      if (Object.keys(updates).length === 0) {
-        toast.info("No changes to save")
-        setIsEditing(false)
-        setIsSaving(false)
-        return
-      }
+      if (profile) {
+        // Update existing profile
+        const updates: Record<string, any> = {}
+        Object.keys(cleanData).forEach((key) => {
+          if (cleanData[key] !== profile[key]) {
+            updates[key] = cleanData[key]
+          }
+        })
 
-      const { error } = await updateProfile(updates)
+        if (Object.keys(updates).length === 0) {
+          toast.info("No changes to save")
+          setIsEditing(false)
+          setIsSaving(false)
+          return
+        }
 
-      if (error) {
-        toast.error(error.message || "Failed to update profile")
-      } else {
+        // Check username if it's being updated
+        if (updates.username && updates.username !== profile.username) {
+          const isAvailable = await checkUsername(updates.username)
+          if (!isAvailable) {
+            toast.error("Username already taken")
+            setIsSaving(false)
+            return
+          }
+        }
+
+        const updatedProfile = await updateProfile(user.id, updates)
+        setProfile(updatedProfile)
+        form.reset(updatedProfile)
         toast.success("Profile updated successfully")
         setIsEditing(false)
+      } else {
+        // Create new profile - only send first_name, last_name, and username
+        const profileData: Record<string, any> = {}
+        if (cleanData.first_name) profileData.first_name = cleanData.first_name
+        if (cleanData.last_name) profileData.last_name = cleanData.last_name
+        if (cleanData.username) profileData.username = cleanData.username.trim()
+
+        // Ensure at least one required field is provided
+        if (!profileData.first_name && !profileData.last_name && !profileData.username) {
+          toast.error("Please fill in at least one field (First Name, Last Name, or Username)")
+          setIsSaving(false)
+          return
+        }
+
+        // Check username if provided
+        if (profileData.username) {
+          const isAvailable = await checkUsername(profileData.username)
+          if (!isAvailable) {
+            toast.error("Username already taken")
+            setIsSaving(false)
+            return
+          }
+        }
+
+        const newProfile = await createProfile(profileData)
+        setProfile(newProfile)
+        form.reset(newProfile)
+        toast.success("Profile created successfully")
       }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "An error occurred"
@@ -89,23 +176,25 @@ export default function SettingsPage() {
   const profileFields = profile ? Object.keys(profile).filter(
     (key) => key !== "id" && key !== "user_id" && key !== "created_at" && key !== "updated_at" && key !== "avatar_url"
   ) : []
-  return (
-    <div className="container mx-auto py-8 max-w-4xl">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Settings</h1>
-        <p className="text-muted-foreground">
-          Manage your account settings and preferences
-        </p>
-      </div>
 
+  return (
+    <div className="max-w-5xl mx-auto px-5 py-8">
       <div className="space-y-6">
+        {/* Page Header */}
+        <div className="space-y-2">
+          <h1 className="text-3xl font-bold">Settings</h1>
+          <p className="text-muted-foreground">
+            Manage your account settings and preferences
+          </p>
+        </div>
+
         {/* Account Settings */}
-        <Card>
-          <CardHeader>
+        <Card className="rounded-xl border-2 shadow">
+          <CardHeader className="p-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <User className="h-5 w-5" />
-                <CardTitle>Account</CardTitle>
+                <CardTitle className="text-2xl font-semibold">Account</CardTitle>
               </div>
               {!isEditing && profile && (
                 <Button onClick={handleEdit} variant="outline" size="sm">
@@ -114,26 +203,28 @@ export default function SettingsPage() {
                 </Button>
               )}
             </div>
-            <CardDescription>
-              Update your account information
+            <CardDescription className="text-sm text-muted-foreground">
+              {profile ? "Update your account information" : "Complete your profile setup"}
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            {!profile ? (
-              <div className="text-center text-muted-foreground py-8">
-                Loading profile...
+          <CardContent className="p-6 pt-0">
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                <span className="ml-2 text-sm text-muted-foreground">Loading profile...</span>
               </div>
             ) : (
               <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                   {user?.email && (
-                    <div className="grid gap-2">
-                      <Label htmlFor="user-email">Email</Label>
+                    <div className="space-y-2">
+                      <Label htmlFor="user-email" className="text-sm font-medium">Email</Label>
                       <Input
                         id="user-email"
                         type="email"
                         value={user.email}
                         disabled
+                        className="h-9"
                       />
                       <p className="text-xs text-muted-foreground">
                         Email cannot be changed
@@ -141,7 +232,9 @@ export default function SettingsPage() {
                     </div>
                   )}
                   
-                  {profileFields.map((fieldName) => {
+                  {profile ? (
+                    // Show existing profile fields
+                    profileFields.map((fieldName) => {
                     const fieldValue = profile[fieldName]
                     const displayName = fieldName
                       .split("_")
@@ -155,7 +248,7 @@ export default function SettingsPage() {
                         name={fieldName}
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>{displayName}</FormLabel>
+                            <FormLabel className="text-sm font-medium">{displayName}</FormLabel>
                             <FormControl>
                               {isEditing ? (
                                 <Input
@@ -170,6 +263,7 @@ export default function SettingsPage() {
                                       : "text"
                                   }
                                   disabled={isSaving}
+                                  className="h-9"
                                 />
                               ) : (
                                 <div className="flex h-9 w-full rounded-md border border-input bg-muted px-3 py-1 text-sm">
@@ -184,27 +278,97 @@ export default function SettingsPage() {
                         )}
                       />
                     )
-                  })}
+                  })
+                  ) : (
+                    // Show profile creation form with first_name, last_name, and username
+                    <>
+                      <FormField
+                        control={form.control}
+                        name="first_name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm font-medium">First Name</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                placeholder="Enter your first name"
+                                disabled={isSaving}
+                                className="h-9"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="last_name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm font-medium">Last Name</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                placeholder="Enter your last name"
+                                disabled={isSaving}
+                                className="h-9"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="username"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm font-medium">Username</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                placeholder="Enter your username"
+                                disabled={isSaving}
+                                className="h-9"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </>
+                  )}
 
-                  {isEditing && (
-                    <CardFooter className="px-0 pt-4 flex gap-2">
+                  {(isEditing || !profile) && (
+                    <CardFooter className="px-0 pt-4 flex gap-3">
                       <Button
                         type="submit"
                         disabled={isSaving}
                         className="flex-1"
                       >
-                        <Save className="mr-2 h-4 w-4" />
-                        {isSaving ? "Saving..." : "Save Changes"}
+                        {isSaving ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="mr-2 h-4 w-4" />
+                            Save Changes
+                          </>
+                        )}
                       </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleCancel}
-                        disabled={isSaving}
-                      >
-                        <X className="mr-2 h-4 w-4" />
-                        Cancel
-                      </Button>
+                      {profile && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleCancel}
+                          disabled={isSaving}
+                        >
+                          <X className="mr-2 h-4 w-4" />
+                          Cancel
+                        </Button>
+                      )}
                     </CardFooter>
                   )}
                 </form>
@@ -214,20 +378,20 @@ export default function SettingsPage() {
         </Card>
 
         {/* Notifications */}
-        <Card>
-          <CardHeader>
+        <Card className="rounded-xl border-2 shadow">
+          <CardHeader className="p-6">
             <div className="flex items-center gap-2">
               <Bell className="h-5 w-5" />
-              <CardTitle>Notifications</CardTitle>
+              <CardTitle className="text-2xl font-semibold">Notifications</CardTitle>
             </div>
-            <CardDescription>
+            <CardDescription className="text-sm text-muted-foreground">
               Configure how you receive notifications
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="p-6 pt-0 space-y-4">
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label>Email Notifications</Label>
+                <Label className="text-sm font-medium">Email Notifications</Label>
                 <p className="text-sm text-muted-foreground">
                   Receive email updates about your account
                 </p>
@@ -239,7 +403,7 @@ export default function SettingsPage() {
             <Separator />
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label>Push Notifications</Label>
+                <Label className="text-sm font-medium">Push Notifications</Label>
                 <p className="text-sm text-muted-foreground">
                   Receive push notifications in your browser
                 </p>
@@ -252,42 +416,48 @@ export default function SettingsPage() {
         </Card>
 
         {/* Security */}
-        <Card>
-          <CardHeader>
+        <Card className="rounded-xl border-2 shadow">
+          <CardHeader className="p-6">
             <div className="flex items-center gap-2">
               <Lock className="h-5 w-5" />
-              <CardTitle>Security</CardTitle>
+              <CardTitle className="text-2xl font-semibold">Security</CardTitle>
             </div>
-            <CardDescription>
+            <CardDescription className="text-sm text-muted-foreground">
               Manage your password and security settings
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-2">
-              <Label htmlFor="current-password">Current Password</Label>
+          <CardContent className="p-6 pt-0 space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="current-password" className="text-sm font-medium">Current Password</Label>
               <Input
                 id="current-password"
                 type="password"
                 placeholder="Enter current password"
+                className="h-9"
+                disabled
               />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="new-password">New Password</Label>
+            <div className="space-y-2">
+              <Label htmlFor="new-password" className="text-sm font-medium">New Password</Label>
               <Input
                 id="new-password"
                 type="password"
                 placeholder="Enter new password"
+                className="h-9"
+                disabled
               />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="confirm-password">Confirm New Password</Label>
+            <div className="space-y-2">
+              <Label htmlFor="confirm-password" className="text-sm font-medium">Confirm New Password</Label>
               <Input
                 id="confirm-password"
                 type="password"
                 placeholder="Confirm new password"
+                className="h-9"
+                disabled
               />
             </div>
-            <Button>
+            <Button disabled>
               <Shield className="mr-2 h-4 w-4" />
               Update Password
             </Button>
@@ -295,25 +465,25 @@ export default function SettingsPage() {
         </Card>
 
         {/* Danger Zone */}
-        <Card className="border-destructive">
-          <CardHeader>
+        <Card className="rounded-xl border-2 border-destructive shadow">
+          <CardHeader className="p-6">
             <div className="flex items-center gap-2">
               <Trash2 className="h-5 w-5 text-destructive" />
-              <CardTitle className="text-destructive">Danger Zone</CardTitle>
+              <CardTitle className="text-2xl font-semibold text-destructive">Danger Zone</CardTitle>
             </div>
-            <CardDescription>
+            <CardDescription className="text-sm text-muted-foreground">
               Irreversible and destructive actions
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="p-6 pt-0 space-y-4">
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label>Delete Account</Label>
+                <Label className="text-sm font-medium">Delete Account</Label>
                 <p className="text-sm text-muted-foreground">
                   Permanently delete your account and all associated data
                 </p>
               </div>
-              <Button variant="destructive" size="sm">
+              <Button variant="destructive" size="sm" disabled>
                 <Trash2 className="mr-2 h-4 w-4" />
                 Delete Account
               </Button>

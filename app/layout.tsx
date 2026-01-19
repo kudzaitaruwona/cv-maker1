@@ -38,10 +38,8 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <AuthProvider>
-            <ProfileProvider>
               <Toaster/>
               {children}
-            </ProfileProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>

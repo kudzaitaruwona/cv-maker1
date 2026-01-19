@@ -32,10 +32,17 @@ export function LoginForm({
     setEmail("");
     setPassword("");
     setError(null);
+    setIsLoading(false); // Ensure loading is false on mount
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Prevent submission if form is empty or already loading
+    if (isLoading || !email || !password) {
+      return;
+    }
+    
     const supabase = createClient();
     setIsLoading(true);
     setError(null);
@@ -49,8 +56,9 @@ export function LoginForm({
       
       toast.success("Logged in successfully");
       
-      // Navigate without setting loading to false to avoid state updates after unmount
+      // Navigate and refresh to update auth state
       router.replace("/dashboard");
+      router.refresh();
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred");
       setIsLoading(false);
