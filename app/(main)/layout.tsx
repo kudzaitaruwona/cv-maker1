@@ -6,7 +6,7 @@ export default function SharedLayout({children}: {children:ReactNode}){
     return(
         <main className="min-h-screen flex flex-col">
             <Navbar/>
-            <div className="flex-1 flex flex-col gap-20 max-w-5xl mx-auto px-5 w-full">
+            <div className="flex-1 flex flex-col max-w-5xl mx-auto px-5 w-full py-8">
                 {children}
             </div>
             <footer className="border-t py-8 mt-auto">
@@ -14,7 +14,7 @@ export default function SharedLayout({children}: {children:ReactNode}){
                 <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                   <div>
                     <h3 className="text-xl font-bold">
-                      Resu<span className="text-blue-500">Me</span>
+                      ResuMe
                     </h3>
                     <p className="text-sm text-muted-foreground mt-1">
                       Your professional achievement manager

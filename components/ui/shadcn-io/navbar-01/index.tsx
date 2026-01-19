@@ -93,10 +93,10 @@ export interface Navbar01Props extends React.HTMLAttributes<HTMLElement> {
 
 // Default navigation links
 const defaultNavigationLinks: Navbar01NavLink[] = [
-  { href: '#', label: 'Home', active: true },
-  { href: '#features', label: 'Features' },
-  { href: '#pricing', label: 'Pricing' },
-  { href: '#about', label: 'About' },
+  { href: '/', label: 'Home', active: true },
+  { href: '/dashboard', label: 'Dashboard' },
+  { href: '/bullets', label: 'Bullets' },
+  { href: '/settings', label: 'Settings' },
 ];
 
 export const Navbar01 = React.forwardRef<HTMLElement, Navbar01Props>(
@@ -107,9 +107,9 @@ export const Navbar01 = React.forwardRef<HTMLElement, Navbar01Props>(
       logoHref = '#',
       navigationLinks = defaultNavigationLinks,
       signInText = 'Sign In',
-      signInHref = '#signin',
+      signInHref = '/auth/login',
       ctaText = 'Get Started',
-      ctaHref = '#get-started',
+      ctaHref = '/auth/sign-up',
       onSignInClick,
       onCtaClick,
       ...props
