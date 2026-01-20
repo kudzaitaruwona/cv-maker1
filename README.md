@@ -1,4 +1,4 @@
-# ![ResuMe Logo](https://via.placeholder.com/40) ResuMe – CV & Achievement Manager
+# ![Resumaide Logo](https://via.placeholder.com/40) Resumaide – CV & Achievement Manager
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green)](https://opensource.org/licenses/MIT)
 [![Next.js](https://img.shields.io/badge/Next.js-13.5-black?logo=next.js)](https://nextjs.org/)
@@ -11,9 +11,9 @@
 
 ## 🚀 Overview
 
-**ResuMe** is a personal CV management tool that helps you **store, organize, and export your professional achievements**. Keep all your work experience, education, projects, certifications, and skills in one central place. Build multiple CV versions and export professional PDFs instantly.
+**Resumaide** is a personal CV management tool that helps you **store, organize, and export your professional achievements**. Keep all your work experience, education, projects, certifications, and skills in one central place. Build multiple CV versions and export professional PDFs instantly.
 
-ResuMe is perfect for:
+Resumaide is perfect for:
 - Students preparing for applications  
 - Freelancers showcasing projects  
 - Professionals maintaining a central career record  

@@ -62,7 +62,7 @@ export function Navbar() {
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
           <Link href="/" className="text-xl font-semibold">
-            ResuMe
+            Resumaide
           </Link>
 
           <div className="hidden md:flex items-center gap-1">

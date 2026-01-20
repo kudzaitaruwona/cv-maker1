@@ -13,8 +13,8 @@ const defaultUrl = process.env.VERCEL_URL
 
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
-  title: "ResuMe - CV & Achievement Manager",
-  description: "Store, organize, and export your professional achievements. Build multiple CV versions and export professional PDFs instantly.",
+  title: "Resumaide - CV & Achievement Manager",
+  description: "Resumaide helps you store, organize, and export your professional achievements. Build multiple CV versions and export professional PDFs instantly.",
 };
 
 const geistSans = Geist({

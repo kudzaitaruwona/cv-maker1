@@ -178,8 +178,7 @@ export default function SettingsPage() {
   ) : []
 
   return (
-    <div className="max-w-5xl mx-auto px-5 py-8">
-      <div className="space-y-6">
+    <div className="space-y-6">
         {/* Page Header */}
         <div className="space-y-2">
           <h1 className="text-3xl font-bold">Settings</h1>
@@ -490,7 +489,6 @@ export default function SettingsPage() {
             </div>
           </CardContent>
         </Card>
-      </div>
     </div>
   )
 }
