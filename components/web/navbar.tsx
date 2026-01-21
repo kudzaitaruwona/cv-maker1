@@ -48,6 +48,9 @@ export function Navbar() {
       <Link className={buttonVariants({ variant: "ghost" })} href="/dashboard">
         Dashboard
       </Link>
+      <Link className={buttonVariants({ variant: "ghost" })} href="/experiences">
+        Experiences
+      </Link>
       <Link className={buttonVariants({ variant: "ghost" })} href="/bullets">
         Bullets
       </Link>
@@ -113,6 +116,9 @@ export function Navbar() {
                     <div className="mt-8 flex flex-col gap-4">
                       <Link href="/dashboard" className="text-sm font-medium">
                         Dashboard
+                      </Link>
+                      <Link href="/experiences" className="text-sm font-medium">
+                        Experiences
                       </Link>
                       <Link href="/bullets" className="text-sm font-medium">
                         Bullets

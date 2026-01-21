@@ -1,26 +1,54 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
+import { BulletItem } from "@/components/cv/BulletItem"
+import { ExperienceSelector } from "@/components/cv/ExperienceSelector"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+  getCV,
+  getCVSections,
+  updateCV,
+  updateTargetPosition,
+  updateCVSection,
+  updateCVBullets,
+  deleteCVSection,
+  deleteCVBullet,
+  addCVSections,
+  addCVBullets,
+  runATSScore,
+  exportPDF,
+} from "@/app/actions/cvs"
+import { getExperiences, getBullets } from "@/app/actions/experiences"
+import type {
+  CVWithDetails,
+  CVSectionWithBullets,
+  CVBullet,
+} from "@/app/types/database"
+import type { MasterExperience, MasterBullet } from "@/app/types/database"
+import { BulletCategories } from "@/app/types/database"
+import {
+  ArrowLeft,
+  Save,
+  Trash2,
+  Plus,
+  Loader2,
+  FileDown,
+  TrendingUp,
+} from "lucide-react"
+import { toast } from "sonner"
+import Link from "next/link"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,272 +59,298 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { ArrowLeft, Loader2, Plus, Trash2, ChevronUp, ChevronDown } from "lucide-react"
-import Link from "next/link"
-import { toast } from "sonner"
-import {
-  getCV,
-  getCVSections,
-  getTargetJobs,
-  updateCV,
-  updateCVSection,
-  createCVSection,
-  deleteCVSection,
-  reorderCVSections,
-  getJobDescription,
-} from "@/app/actions/cv"
-import type { CV, TargetJob, CVSection } from "@/app/types/cv"
-import { CVSectionType } from "@/app/types/cv"
+
+const categoryOrder: BulletCategories[] = [
+  BulletCategories.Experience,
+  BulletCategories.Projects,
+  BulletCategories.Education,
+  BulletCategories.Skills,
+  BulletCategories.Certifications,
+  BulletCategories.Other,
+]
 
 export default function EditCVPage() {
   const params = useParams()
   const router = useRouter()
-  const cvId = typeof params.id === "string" ? params.id : params.id?.[0]
+  const cvId = params.id as string
 
-  const [cv, setCV] = useState<CV | null>(null)
-  const [sections, setSections] = useState<CVSection[]>([])
-  const [targetJobs, setTargetJobs] = useState<TargetJob[]>([])
-  const [jobDescription, setJobDescription] = useState("")
-  const [isLoading, setIsLoading] = useState(true)
-  const [isSaving, setIsSaving] = useState(false)
-  const [deleteSectionDialogOpen, setDeleteSectionDialogOpen] = useState(false)
-  const [sectionToDelete, setSectionToDelete] = useState<CVSection | null>(null)
-  const [isDeletingSection, setIsDeletingSection] = useState(false)
+  const [cv, setCV] = useState<CVWithDetails | null>(null)
+  const [sections, setSections] = useState<CVSectionWithBullets[]>([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [showAddExperience, setShowAddExperience] = useState<string | null>(null)
+  const [availableExperiences, setAvailableExperiences] = useState<
+    Array<MasterExperience & { bullets?: MasterBullet[] }>
+  >([])
+  const [selectedExperiences, setSelectedExperiences] = useState<Set<string>>(new Set())
+  const [selectedBullets, setSelectedBullets] = useState<Set<string>>(new Set())
 
   // Form state
   const [cvTitle, setCVTitle] = useState("")
-  const [selectedTargetJobId, setSelectedTargetJobId] = useState<string>("__none__")
-  const [editingSectionId, setEditingSectionId] = useState<string | null>(null)
-  const [sectionTitles, setSectionTitles] = useState<Record<string, string>>({})
-  const [sectionContents, setSectionContents] = useState<Record<string, string>>({})
+  const [targetJobTitle, setTargetJobTitle] = useState("")
+  const [targetCompany, setTargetCompany] = useState("")
+  const [targetDescription, setTargetDescription] = useState("")
 
   useEffect(() => {
-    if (!cvId) return
+    if (cvId) {
+      loadData()
+    }
+  }, [cvId])
 
-    const fetchData = async () => {
-      setIsLoading(true)
-      try {
-        const [cvData, sectionsData, targetJobsData, jobDescData] = await Promise.all([
-          getCV(cvId),
-          getCVSections(cvId),
-          getTargetJobs(),
-          getJobDescription(cvId),
-        ])
-
-        setCV(cvData)
-        setCVTitle(cvData.title)
-        // Convert null/empty to "__none__" for Select component
-        setSelectedTargetJobId(cvData.target_job_id || "__none__")
-        setSections(sectionsData || [])
-
-        // Initialize section form state
-        const titles: Record<string, string> = {}
-        const contents: Record<string, string> = {}
-        sectionsData.forEach((section) => {
-          titles[section.id] = section.title
-          contents[section.id] = section.content || ""
-        })
-        setSectionTitles(titles)
-        setSectionContents(contents)
-
-        // Set target jobs
-        setTargetJobs(targetJobsData || [])
-
-        // Set job description
-        if (jobDescData?.job_description) {
-          setJobDescription(jobDescData.job_description)
-        }
-      } catch (error) {
-        console.error("Failed to fetch CV data:", error)
-        toast.error("Failed to load CV. Please try again.")
-        router.push("/cvs")
-      } finally {
-        setIsLoading(false)
+  const loadData = async () => {
+    try {
+      setLoading(true)
+      const [cvData, sectionsData] = await Promise.all([
+        getCV(cvId),
+        getCVSections(cvId),
+      ])
+      setCV(cvData)
+      setSections(sectionsData)
+      setCVTitle(cvData.title)
+      if (cvData.target_position) {
+        setTargetJobTitle(cvData.target_position.title)
+        setTargetCompany(cvData.target_position.company)
+        setTargetDescription(cvData.target_position.description || "")
       }
+    } catch (error) {
+      toast.error("Failed to load CV")
+      console.error(error)
+      router.push("/cvs")
+    } finally {
+      setLoading(false)
     }
+  }
 
-    fetchData()
-  }, [cvId, router])
-
-  const handleSaveCV = async () => {
-    if (!cvId || !cvTitle.trim()) {
-      toast.error("Please enter a CV title")
-      return
-    }
-
-    setIsSaving(true)
+  const loadAvailableExperiences = async (category: BulletCategories) => {
     try {
-      // Convert "__none__" to null for database
-      const finalTargetJobId = selectedTargetJobId === "__none__" || !selectedTargetJobId ? null : selectedTargetJobId
+      const expData = await getExperiences()
+      const categoryExperiences = expData.filter((exp) => exp.type === category)
       
-      await updateCV(cvId, {
-        title: cvTitle.trim(),
-        target_job_id: finalTargetJobId,
-      })
-
-      // TODO: Save job description if changed
-      // await updateJobDescription(cvId, jobDescription)
-
-      toast.success("CV updated successfully")
+      const experiencesWithBullets = await Promise.all(
+        categoryExperiences.map(async (exp) => {
+          const bullets = await getBullets(exp.id)
+          return { ...exp, bullets }
+        })
+      )
+      
+      setAvailableExperiences(experiencesWithBullets)
     } catch (error) {
-      console.error("Failed to update CV:", error)
-      toast.error("Failed to update CV. Please try again.")
-    } finally {
-      setIsSaving(false)
+      toast.error("Failed to load experiences")
+      console.error(error)
     }
   }
 
-  const handleSaveSection = async (sectionId: string) => {
-    const title = sectionTitles[sectionId]?.trim()
-    const content = sectionContents[sectionId]?.trim()
+  const handleSaveCVDetails = async () => {
+    if (!cv) return
 
-    if (!title) {
-      toast.error("Please enter a section title")
+    try {
+      setSaving(true)
+      
+      // Update CV title
+      await updateCV(cv.id, { title: cvTitle })
+
+      // Update target position if it exists
+      if (cv.target_position) {
+        await updateTargetPosition(cv.target_position.id, {
+          title: targetJobTitle,
+          company: targetCompany,
+          description: targetDescription || null,
+        })
+      }
+
+      toast.success("CV details saved successfully")
+      loadData()
+    } catch (error) {
+      toast.error("Failed to save CV details")
+      console.error(error)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleSaveSection = async (section: CVSectionWithBullets) => {
+    try {
+      setSaving(true)
+
+      // Update section details
+      await updateCVSection(section.id, {
+        title: section.title,
+        organization: section.organization,
+        start_date: section.start_date,
+        end_date: section.end_date,
+        location: section.location,
+      })
+
+      // Update bullets
+      if (section.bullets && section.bullets.length > 0) {
+        await updateCVBullets(
+          section.id,
+          section.bullets.map((bullet) => ({
+            id: bullet.id,
+            content: bullet.content,
+          }))
+        )
+      }
+
+      toast.success("Section saved successfully")
+      loadData()
+    } catch (error) {
+      toast.error("Failed to save section")
+      console.error(error)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDeleteSection = async (sectionId: string) => {
+    try {
+      await deleteCVSection(sectionId)
+      toast.success("Section deleted successfully")
+      loadData()
+    } catch (error) {
+      toast.error("Failed to delete section")
+      console.error(error)
+    }
+  }
+
+  const handleUpdateBullet = async (
+    sectionId: string,
+    bulletId: string,
+    content: string
+  ) => {
+    const updatedSections = sections.map((section) => {
+      if (section.id === sectionId) {
+        return {
+          ...section,
+          bullets: section.bullets?.map((bullet) =>
+            bullet.id === bulletId ? { ...bullet, content } : bullet
+          ),
+        }
+      }
+      return section
+    })
+    setSections(updatedSections)
+  }
+
+  const handleDeleteBullet = async (bulletId: string) => {
+    try {
+      await deleteCVBullet(bulletId)
+      toast.success("Bullet deleted successfully")
+      loadData()
+    } catch (error) {
+      toast.error("Failed to delete bullet")
+      console.error(error)
+    }
+  }
+
+  const handleAddExperiences = async (category: BulletCategories) => {
+    if (selectedExperiences.size === 0) {
+      toast.error("Please select at least one experience")
       return
     }
 
     try {
-      await updateCVSection(sectionId, {
-        title,
-        content: content || undefined,
+      setSaving(true)
+
+      const experienceSelections = Array.from(selectedExperiences).map((expId) => {
+        const exp = availableExperiences.find((e) => e.id === expId)
+        if (!exp) throw new Error(`Experience ${expId} not found`)
+        return {
+          master_experience_id: expId,
+          master_experience: exp,
+        }
       })
 
-      // Update local state
-      setSections((prev) =>
-        prev.map((s) =>
-          s.id === sectionId
-            ? { ...s, title, content: content || null }
-            : s
+      const newSections = await addCVSections(cvId, experienceSelections)
+
+      // Add bullets for each new section
+      for (const section of newSections) {
+        const experience = availableExperiences.find(
+          (e) => e.id === section.master_experience_id
         )
-      )
+        if (!experience || !experience.bullets) continue
 
-      setEditingSectionId(null)
-      toast.success("Section updated successfully")
+        const selectedBulletsForExp = experience.bullets.filter((bullet) =>
+          selectedBullets.has(bullet.id)
+        )
+
+        if (selectedBulletsForExp.length > 0) {
+          const bulletSelections = selectedBulletsForExp.map((bullet) => ({
+            master_bullet_id: bullet.id,
+            master_bullet: bullet,
+          }))
+
+          await addCVBullets(section.id, bulletSelections)
+        }
+      }
+
+      toast.success("Experiences added successfully")
+      setShowAddExperience(null)
+      setSelectedExperiences(new Set())
+      setSelectedBullets(new Set())
+      loadData()
     } catch (error) {
-      console.error("Failed to update section:", error)
-      toast.error("Failed to update section. Please try again.")
-    }
-  }
-
-  const handleAddSection = async (sectionType: CVSectionType) => {
-    if (!cvId) return
-
-    const newSortOrder =
-      sections.length > 0
-        ? Math.max(...sections.map((s) => s.sort_order)) + 1
-        : 0
-
-    try {
-      const newSection = await createCVSection(cvId, {
-        type: sectionType,
-        title: `${sectionType} Section`,
-        sort_order: newSortOrder,
-        content: "",
-      })
-
-      setSections((prev) => [...prev, newSection])
-      setSectionTitles((prev) => ({ ...prev, [newSection.id]: newSection.title }))
-      setSectionContents((prev) => ({ ...prev, [newSection.id]: "" }))
-      setEditingSectionId(newSection.id)
-      toast.success("Section added successfully")
-    } catch (error) {
-      console.error("Failed to create section:", error)
-      toast.error("Failed to add section. Please try again.")
-    }
-  }
-
-  const handleDeleteSectionClick = (section: CVSection) => {
-    setSectionToDelete(section)
-    setDeleteSectionDialogOpen(true)
-  }
-
-  const handleDeleteSectionConfirm = async () => {
-    if (!sectionToDelete) return
-
-    setIsDeletingSection(true)
-    try {
-      await deleteCVSection(sectionToDelete.id)
-      setSections((prev) => prev.filter((s) => s.id !== sectionToDelete.id))
-      setSectionTitles((prev) => {
-        const updated = { ...prev }
-        delete updated[sectionToDelete.id]
-        return updated
-      })
-      setSectionContents((prev) => {
-        const updated = { ...prev }
-        delete updated[sectionToDelete.id]
-        return updated
-      })
-      toast.success("Section deleted successfully")
-      setDeleteSectionDialogOpen(false)
-      setSectionToDelete(null)
-    } catch (error) {
-      console.error("Failed to delete section:", error)
-      toast.error("Failed to delete section. Please try again.")
+      toast.error("Failed to add experiences")
+      console.error(error)
     } finally {
-      setIsDeletingSection(false)
+      setSaving(false)
     }
   }
 
-  const handleMoveSection = async (sectionId: string, direction: "up" | "down") => {
-    const sectionIndex = sections.findIndex((s) => s.id === sectionId)
-    if (sectionIndex === -1) return
-
-    const newIndex = direction === "up" ? sectionIndex - 1 : sectionIndex + 1
-    if (newIndex < 0 || newIndex >= sections.length) return
-
-    const updatedSections = [...sections]
-    const [movedSection] = updatedSections.splice(sectionIndex, 1)
-    updatedSections.splice(newIndex, 0, movedSection)
-
-    // Update sort orders
-    const sectionOrders = updatedSections.map((s, idx) => ({
-      id: s.id,
-      sort_order: idx,
-    }))
-
+  const handleRunATS = async () => {
     try {
-      await reorderCVSections(cvId!, sectionOrders)
-      setSections(updatedSections)
-      toast.success("Section reordered successfully")
+      setSaving(true)
+      await runATSScore(cvId)
+      toast.success("ATS score generated successfully")
+      loadData()
     } catch (error) {
-      console.error("Failed to reorder sections:", error)
-      toast.error("Failed to reorder section. Please try again.")
+      toast.error("Failed to generate ATS score")
+      console.error(error)
+    } finally {
+      setSaving(false)
     }
   }
 
-  const sectionTypeOptions = Object.values(CVSectionType)
+  const handleExportPDF = async () => {
+    try {
+      setSaving(true)
+      const blob = await exportPDF(cvId)
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `${cvTitle || "CV"}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      toast.success("PDF exported successfully")
+    } catch (error) {
+      toast.error("Failed to export PDF")
+      console.error(error)
+    } finally {
+      setSaving(false)
+    }
+  }
 
-  if (isLoading) {
+  const groupedSections = categoryOrder.reduce((acc, category) => {
+    acc[category] = sections.filter((section) => section.type === category)
+    return acc
+  }, {} as Record<BulletCategories, CVSectionWithBullets[]>)
+
+  if (loading) {
     return (
-      <div className="space-y-6">
-        <Card>
-          <CardContent className="py-12 text-center">
-            <Loader2 className="h-6 w-6 animate-spin mx-auto mb-4 text-muted-foreground" />
-            <p className="text-muted-foreground">Loading CV...</p>
-          </CardContent>
-        </Card>
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     )
   }
 
   if (!cv) {
-    return (
-      <div className="space-y-6">
-        <Card>
-          <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground mb-4">CV not found</p>
-            <Button asChild variant="outline">
-              <Link href="/cvs">Back to CVs</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    )
+    return null
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" asChild>
           <Link href="/cvs">
@@ -304,277 +358,324 @@ export default function EditCVPage() {
             <span className="sr-only">Back</span>
           </Link>
         </Button>
-        <div>
-          <h1 className="text-3xl font-semibold mb-2">Edit CV</h1>
-          <p className="text-muted-foreground">
-            Manage your CV details and sections
-          </p>
+        <div className="flex-1">
+          <h1 className="text-3xl font-bold">Edit CV</h1>
         </div>
       </div>
 
-      {/* CV Details */}
-      <Card className="rounded-xl border-2 shadow">
-        <CardHeader className="p-6">
+      {/* CV Details Section */}
+      <Card className="rounded-xl border-2">
+        <CardHeader>
           <CardTitle>CV Details</CardTitle>
-          <CardDescription>Update your CV title and target job</CardDescription>
         </CardHeader>
-        <CardContent className="p-6 pt-0 space-y-6">
+        <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="cv-title">CV Title *</Label>
+            <Label>CV Title</Label>
             <Input
-              id="cv-title"
-              type="text"
               value={cvTitle}
               onChange={(e) => setCVTitle(e.target.value)}
-              disabled={isSaving}
-              className="h-9"
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="target-job">Target Job</Label>
-            <Select
-              value={selectedTargetJobId}
-              onValueChange={setSelectedTargetJobId}
-              disabled={isSaving}
-            >
-              <SelectTrigger id="target-job" className="h-9">
-                <SelectValue placeholder="Select a target job (optional)" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">No target job</SelectItem>
-                {targetJobs.map((job) => (
-                  <SelectItem key={job.id} value={job.id}>
-                    {job.title}
-                    {job.company && ` at ${job.company}`}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {cv.target_position && (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Job Title</Label>
+                  <Input
+                    value={targetJobTitle}
+                    onChange={(e) => setTargetJobTitle(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Company</Label>
+                  <Input
+                    value={targetCompany}
+                    onChange={(e) => setTargetCompany(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Job Description</Label>
+                <Textarea
+                  value={targetDescription}
+                  onChange={(e) => setTargetDescription(e.target.value)}
+                  className="min-h-[150px]"
+                />
+              </div>
+            </>
+          )}
 
-          <div className="space-y-2">
-            <Label htmlFor="job-description">Job Description</Label>
-            <Textarea
-              id="job-description"
-              value={jobDescription}
-              onChange={(e) => setJobDescription(e.target.value)}
-              disabled={isSaving}
-              className="min-h-[120px]"
-              placeholder="Enter or paste the job description here..."
-            />
-          </div>
-
-          <div className="flex gap-3">
-            <Button onClick={handleSaveCV} disabled={isSaving}>
-              {isSaving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                "Save Changes"
-              )}
-            </Button>
-            <Button variant="outline" asChild>
-              <Link href="/cvs">Cancel</Link>
-            </Button>
-          </div>
+          <Button onClick={handleSaveCVDetails} disabled={saving}>
+            <Save className="mr-2 h-4 w-4" />
+            Save CV Details
+          </Button>
         </CardContent>
       </Card>
 
-      {/* CV Sections */}
-      <Card className="rounded-xl border-2 shadow">
-        <CardHeader className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>CV Sections</CardTitle>
-              <CardDescription>Manage the sections of your CV</CardDescription>
-            </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Section
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                {sectionTypeOptions.map((type) => (
-                  <DropdownMenuItem
-                    key={type}
-                    onClick={() => handleAddSection(type)}
-                  >
-                    {type}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </CardHeader>
-        <CardContent className="p-6 pt-0">
-          {sections.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground mb-4">No sections yet</p>
-              <p className="text-sm text-muted-foreground">
-                Click "Add Section" to get started
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {sections.map((section, index) => {
-                const isEditing = editingSectionId === section.id
-                return (
-                  <Card key={section.id} className="border">
-                    <CardHeader className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <Badge variant="outline">{section.type}</Badge>
-                          {isEditing ? (
-                            <Input
-                              value={sectionTitles[section.id] || ""}
-                              onChange={(e) =>
-                                setSectionTitles((prev) => ({
-                                  ...prev,
-                                  [section.id]: e.target.value,
-                                }))
-                              }
-                              placeholder="Section title"
-                              className="h-8 w-auto min-w-[200px]"
-                            />
-                          ) : (
-                            <CardTitle className="text-lg">{section.title}</CardTitle>
-                          )}
+      {/* CV Sections by Category */}
+      <div className="space-y-6">
+        {categoryOrder.map((category) => {
+          const categorySections = groupedSections[category]
+          if (categorySections.length === 0 && showAddExperience !== category) {
+            return null
+          }
+
+          return (
+            <Card key={category} className="rounded-xl border-2">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle>{category}</CardTitle>
+                  {!showAddExperience && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setShowAddExperience(category)
+                        loadAvailableExperiences(category)
+                      }}
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Experience
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {showAddExperience === category && (
+                  <Card className="border-2 border-dashed">
+                    <CardContent className="p-6">
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-semibold">Select Experiences to Add</h3>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setShowAddExperience(null)
+                              setSelectedExperiences(new Set())
+                              setSelectedBullets(new Set())
+                            }}
+                          >
+                            Cancel
+                          </Button>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <ExperienceSelector
+                          experiences={availableExperiences}
+                          selectedExperiences={selectedExperiences}
+                          selectedBullets={selectedBullets}
+                          onExperienceToggle={(id, checked) => {
+                            const newSet = new Set(selectedExperiences)
+                            if (checked) {
+                              newSet.add(id)
+                            } else {
+                              newSet.delete(id)
+                            }
+                            setSelectedExperiences(newSet)
+                          }}
+                          onBulletToggle={(id, checked) => {
+                            const newSet = new Set(selectedBullets)
+                            if (checked) {
+                              newSet.add(id)
+                            } else {
+                              newSet.delete(id)
+                            }
+                            setSelectedBullets(newSet)
+                          }}
+                        />
+                        <div className="flex justify-end">
                           <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => handleMoveSection(section.id, "up")}
-                            disabled={index === 0}
+                            onClick={() => handleAddExperiences(category)}
+                            disabled={saving}
                           >
-                            <ChevronUp className="h-4 w-4" />
-                            <span className="sr-only">Move up</span>
+                            Add Selected
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => handleMoveSection(section.id, "down")}
-                            disabled={index === sections.length - 1}
-                          >
-                            <ChevronDown className="h-4 w-4" />
-                            <span className="sr-only">Move down</span>
-                          </Button>
-                          {isEditing ? (
-                            <>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleSaveSection(section.id)}
-                              >
-                                Save
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  setEditingSectionId(null)
-                                  // Reset form state
-                                  setSectionTitles((prev) => ({
-                                    ...prev,
-                                    [section.id]: section.title,
-                                  }))
-                                  setSectionContents((prev) => ({
-                                    ...prev,
-                                    [section.id]: section.content || "",
-                                  }))
-                                }}
-                              >
-                                Cancel
-                              </Button>
-                            </>
-                          ) : (
-                            <>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setEditingSectionId(section.id)}
-                              >
-                                Edit
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-destructive"
-                                onClick={() => handleDeleteSectionClick(section)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                                <span className="sr-only">Delete</span>
-                              </Button>
-                            </>
-                          )}
                         </div>
                       </div>
-                    </CardHeader>
-                    <CardContent className="p-4 pt-0">
-                      {isEditing ? (
-                        <div className="space-y-2">
-                          <Textarea
-                            value={sectionContents[section.id] || ""}
-                            onChange={(e) =>
-                              setSectionContents((prev) => ({
-                                ...prev,
-                                [section.id]: e.target.value,
-                              }))
-                            }
-                            placeholder="Enter section content..."
-                            className="min-h-[100px]"
-                          />
-                        </div>
-                      ) : (
-                        <div className="text-sm text-muted-foreground">
-                          {section.content || (
-                            <span className="italic">No content yet</span>
-                          )}
-                        </div>
-                      )}
                     </CardContent>
                   </Card>
-                )
-              })}
-            </div>
-          )}
+                )}
+
+                {categorySections.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-8">
+                    No experiences in this category yet
+                  </p>
+                ) : (
+                  <Accordion type="multiple" className="space-y-3">
+                    {categorySections.map((section) => (
+                      <AccordionItem
+                        key={section.id}
+                        value={section.id}
+                        className="border rounded-lg px-4"
+                      >
+                        <AccordionTrigger className="hover:no-underline">
+                          <div className="flex-1 text-left">
+                            <div className="font-medium">{section.title}</div>
+                            {section.organization && (
+                              <div className="text-sm text-muted-foreground">
+                                {section.organization}
+                              </div>
+                            )}
+                            {section.start_date && (
+                              <div className="text-xs text-muted-foreground">
+                                {new Date(section.start_date).toLocaleDateString()} -{" "}
+                                {section.end_date
+                                  ? new Date(section.end_date).toLocaleDateString()
+                                  : "Present"}
+                              </div>
+                            )}
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent>
+                          <div className="space-y-4 pt-4">
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label>Title</Label>
+                                <Input
+                                  value={section.title}
+                                  onChange={(e) => {
+                                    const updated = sections.map((s) =>
+                                      s.id === section.id
+                                        ? { ...s, title: e.target.value }
+                                        : s
+                                    )
+                                    setSections(updated)
+                                  }}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Organization</Label>
+                                <Input
+                                  value={section.organization || ""}
+                                  onChange={(e) => {
+                                    const updated = sections.map((s) =>
+                                      s.id === section.id
+                                        ? { ...s, organization: e.target.value }
+                                        : s
+                                    )
+                                    setSections(updated)
+                                  }}
+                                />
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-3 gap-4">
+                              <div className="space-y-2">
+                                <Label>Start Date</Label>
+                                <Input
+                                  type="date"
+                                  value={section.start_date || ""}
+                                  onChange={(e) => {
+                                    const updated = sections.map((s) =>
+                                      s.id === section.id
+                                        ? { ...s, start_date: e.target.value }
+                                        : s
+                                    )
+                                    setSections(updated)
+                                  }}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>End Date</Label>
+                                <Input
+                                  type="date"
+                                  value={section.end_date || ""}
+                                  onChange={(e) => {
+                                    const updated = sections.map((s) =>
+                                      s.id === section.id
+                                        ? { ...s, end_date: e.target.value }
+                                        : s
+                                    )
+                                    setSections(updated)
+                                  }}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Location</Label>
+                                <Input
+                                  value={section.location || ""}
+                                  onChange={(e) => {
+                                    const updated = sections.map((s) =>
+                                      s.id === section.id
+                                        ? { ...s, location: e.target.value }
+                                        : s
+                                    )
+                                    setSections(updated)
+                                  }}
+                                />
+                              </div>
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label>Bullets</Label>
+                              {section.bullets && section.bullets.length > 0 ? (
+                                <div className="space-y-2">
+                                  {section.bullets.map((bullet) => (
+                                    <BulletItem
+                                      key={bullet.id}
+                                      bullet={bullet}
+                                      onEdit={(id, content) =>
+                                        handleUpdateBullet(section.id, id, content)
+                                      }
+                                      onDelete={handleDeleteBullet}
+                                      showEditButtons={true}
+                                      isEdited={
+                                        bullet.master_bullet_id !== null &&
+                                        bullet.previous_content !== null
+                                      }
+                                    />
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-sm text-muted-foreground">
+                                  No bullets for this section
+                                </p>
+                              )}
+                            </div>
+
+                            <div className="flex gap-2 pt-2 border-t">
+                              <Button
+                                onClick={() => handleSaveSection(section)}
+                                disabled={saving}
+                              >
+                                <Save className="mr-2 h-4 w-4" />
+                                Save Section
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                onClick={() => handleDeleteSection(section.id)}
+                                disabled={saving}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete Section
+                              </Button>
+                            </div>
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    ))}
+                  </Accordion>
+                )}
+              </CardContent>
+            </Card>
+          )
+        })}
+      </div>
+
+      {/* Actions */}
+      <Card className="rounded-xl border-2">
+        <CardContent className="p-6">
+          <div className="flex gap-3 justify-end">
+            <Button variant="outline" onClick={handleRunATS} disabled={saving}>
+              <TrendingUp className="mr-2 h-4 w-4" />
+              Run ATS Score
+            </Button>
+            <Button onClick={handleExportPDF} disabled={saving}>
+              <FileDown className="mr-2 h-4 w-4" />
+              Export PDF
+            </Button>
+          </div>
         </CardContent>
       </Card>
-
-      <AlertDialog
-        open={deleteSectionDialogOpen}
-        onOpenChange={setDeleteSectionDialogOpen}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the section{" "}
-              {sectionToDelete && (
-                <span className="font-medium">"{sectionToDelete.title}"</span>
-              )}
-              .
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeletingSection}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteSectionConfirm}
-              disabled={isDeletingSection}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {isDeletingSection ? "Deleting..." : "Delete"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   )
 }

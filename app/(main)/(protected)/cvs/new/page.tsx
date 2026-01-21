@@ -1,99 +1,208 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { StepIndicator } from "@/components/cv/StepIndicator"
+import { ExperienceSelector } from "@/components/cv/ExperienceSelector"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { ArrowLeft, Loader2 } from "lucide-react"
-import { getTargetJobs, createCV } from "@/app/actions/cv"
-import type { TargetJob } from "@/app/types/cv"
+import { ArrowLeft, Loader2, ChevronRight, ChevronLeft } from "lucide-react"
+import {
+  getExperiences,
+  getBullets,
+} from "@/app/actions/experiences"
+import {
+  createTargetPosition,
+  createCV,
+  createCVSections,
+  createCVBullets,
+} from "@/app/actions/cvs"
+import type { MasterExperience, MasterBullet } from "@/app/types/database"
 
 export default function NewCVPage() {
   const router = useRouter()
-  const [title, setTitle] = useState("")
-  const [targetJobId, setTargetJobId] = useState<string>("__none__")
+  const [step, setStep] = useState(1)
+  const [loading, setLoading] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+
+  // Step 1: Job Details
+  const [jobTitle, setJobTitle] = useState("")
+  const [company, setCompany] = useState("")
   const [jobDescription, setJobDescription] = useState("")
-  const [targetJobs, setTargetJobs] = useState<TargetJob[]>([])
-  const [isLoadingTargetJobs, setIsLoadingTargetJobs] = useState(true)
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [targetPositionId, setTargetPositionId] = useState<string | null>(null)
+  const [cvId, setCvId] = useState<string | null>(null)
+
+  // Step 2: Experience Selection
+  const [experiences, setExperiences] = useState<
+    Array<MasterExperience & { bullets?: MasterBullet[] }>
+  >([])
+  const [selectedExperiences, setSelectedExperiences] = useState<Set<string>>(new Set())
+  const [selectedBullets, setSelectedBullets] = useState<Set<string>>(new Set())
 
   useEffect(() => {
-    const fetchTargetJobs = async () => {
-      setIsLoadingTargetJobs(true)
-      try {
-        const data = await getTargetJobs()
-        setTargetJobs(data || [])
-      } catch (error) {
-        console.error("Failed to fetch target jobs:", error)
-        toast.error("Failed to load target jobs")
-      } finally {
-        setIsLoadingTargetJobs(false)
-      }
+    if (step === 2) {
+      loadExperiences()
     }
-    fetchTargetJobs()
-  }, [])
+  }, [step])
 
-  // Auto-populate job description when target job is selected
-  useEffect(() => {
-    if (targetJobId) {
-      const selectedJob = targetJobs.find((job) => job.id === targetJobId)
-      if (selectedJob?.description) {
-        setJobDescription(selectedJob.description)
-      }
-    }
-  }, [targetJobId, targetJobs])
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (!title.trim()) {
-      toast.error("Please enter a CV title")
-      return
-    }
-
-    setIsSubmitting(true)
-
+  const loadExperiences = async () => {
     try {
-      // Convert "__none__" to null for database
-      const finalTargetJobId = targetJobId === "__none__" || !targetJobId ? null : targetJobId
+      setLoading(true)
+      const expData = await getExperiences()
       
-      const newCV = await createCV({
-        title: title.trim(),
-        target_job_id: finalTargetJobId,
-      })
-
-      // TODO: If job description is provided, save it to JobDescriptions table
-      // This would be done in a separate action or within createCV
-      if (jobDescription.trim()) {
-        // await saveJobDescription(newCV.id, jobDescription.trim())
-        console.log("Job description to save:", jobDescription.trim())
-      }
-
-      toast.success("CV created successfully")
-      router.push(`/cvs/${newCV.id}/edit`)
-      router.refresh()
+      // Load bullets for each experience
+      const experiencesWithBullets = await Promise.all(
+        expData.map(async (exp) => {
+          const bullets = await getBullets(exp.id)
+          return { ...exp, bullets }
+        })
+      )
+      
+      setExperiences(experiencesWithBullets)
     } catch (error) {
-      console.error("Failed to create CV:", error)
-      toast.error("Failed to create CV. Please try again.")
+      toast.error("Failed to load experiences")
+      console.error(error)
     } finally {
-      setIsSubmitting(false)
+      setLoading(false)
     }
   }
 
+  const handleStep1Submit = async () => {
+    if (!jobTitle.trim() || !company.trim()) {
+      toast.error("Please fill in job title and company")
+      return
+    }
+
+    try {
+      setSubmitting(true)
+      
+      // Create target position
+      const targetPosition = await createTargetPosition({
+        title: jobTitle.trim(),
+        company: company.trim(),
+        description: jobDescription.trim() || null,
+      })
+      setTargetPositionId(targetPosition.id)
+
+      // Create CV with temporary title (will be updated later)
+      const cv = await createCV({
+        title: `${jobTitle} at ${company}`,
+        target_position_id: targetPosition.id,
+      })
+      setCvId(cv.id)
+
+      setStep(2)
+    } catch (error) {
+      toast.error("Failed to create CV")
+      console.error(error)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleStep2Submit = async () => {
+    if (selectedExperiences.size === 0) {
+      toast.error("Please select at least one experience")
+      return
+    }
+
+    if (!cvId) {
+      toast.error("CV not found. Please start over.")
+      return
+    }
+
+    try {
+      setSubmitting(true)
+
+      // Prepare selections
+      const experienceSelections = Array.from(selectedExperiences).map((expId) => {
+        const exp = experiences.find((e) => e.id === expId)
+        if (!exp) throw new Error(`Experience ${expId} not found`)
+        return {
+          master_experience_id: expId,
+          master_experience: exp,
+        }
+      })
+
+      // Create CV sections
+      const sections = await createCVSections(cvId, experienceSelections)
+
+      // Create CV bullets for each section
+      for (const section of sections) {
+        const experience = experiences.find((e) => e.id === section.master_experience_id)
+        if (!experience || !experience.bullets) continue
+
+        // Filter bullets that are selected
+        const selectedBulletsForExp = experience.bullets.filter((bullet) =>
+          selectedBullets.has(bullet.id)
+        )
+
+        if (selectedBulletsForExp.length > 0) {
+          const bulletSelections = selectedBulletsForExp.map((bullet) => ({
+            master_bullet_id: bullet.id,
+            master_bullet: bullet,
+          }))
+
+          await createCVBullets(section.id, bulletSelections)
+        }
+      }
+
+      toast.success("CV created successfully")
+      router.push(`/cvs/${cvId}/edit`)
+    } catch (error) {
+      toast.error("Failed to create CV sections")
+      console.error(error)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleExperienceToggle = (experienceId: string, checked: boolean) => {
+    const newSelected = new Set(selectedExperiences)
+    if (checked) {
+      newSelected.add(experienceId)
+      // Auto-select all bullets for this experience
+      const experience = experiences.find((e) => e.id === experienceId)
+      if (experience?.bullets) {
+        const newBullets = new Set(selectedBullets)
+        experience.bullets.forEach((bullet) => newBullets.add(bullet.id))
+        setSelectedBullets(newBullets)
+      }
+    } else {
+      newSelected.delete(experienceId)
+      // Auto-deselect all bullets for this experience
+      const experience = experiences.find((e) => e.id === experienceId)
+      if (experience?.bullets) {
+        const newBullets = new Set(selectedBullets)
+        experience.bullets.forEach((bullet) => newBullets.delete(bullet.id))
+        setSelectedBullets(newBullets)
+      }
+    }
+    setSelectedExperiences(newSelected)
+  }
+
+  const handleBulletToggle = (bulletId: string, checked: boolean) => {
+    const newSelected = new Set(selectedBullets)
+    if (checked) {
+      newSelected.add(bulletId)
+    } else {
+      newSelected.delete(bulletId)
+    }
+    setSelectedBullets(newSelected)
+  }
+
+  const selectedCount = {
+    experiences: selectedExperiences.size,
+    bullets: selectedBullets.size,
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" asChild>
           <Link href="/cvs">
@@ -102,114 +211,151 @@ export default function NewCVPage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-semibold mb-2">Create New CV</h1>
-          <p className="text-muted-foreground">
-            Start building a new curriculum vitae
+          <h1 className="text-3xl font-bold">Create New CV</h1>
+          <p className="text-muted-foreground mt-2">
+            Build a tailored CV for your job application
           </p>
         </div>
       </div>
 
-      <Card className="rounded-xl border-2 shadow">
-        <CardHeader className="p-6">
-          <CardTitle>CV Information</CardTitle>
-          <CardDescription>
-            Fill in the details for your new CV
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-6 pt-0">
-          <form onSubmit={handleSubmit} className="space-y-6">
+      <StepIndicator
+        currentStep={step}
+        totalSteps={2}
+        stepLabels={["Job Details", "Select Content"]}
+      />
+
+      {step === 1 && (
+        <Card className="rounded-xl border-2">
+          <CardHeader>
+            <CardTitle>Step 1: Job Details</CardTitle>
+            <CardDescription>
+              Tell us about the job you're applying for
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="title">CV Title *</Label>
+              <Label htmlFor="job-title">Job Title *</Label>
               <Input
-                id="title"
-                type="text"
-                placeholder="e.g., Software Engineer CV"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                required
-                disabled={isSubmitting}
-                className="h-9"
+                id="job-title"
+                value={jobTitle}
+                onChange={(e) => setJobTitle(e.target.value)}
+                placeholder="e.g., Software Engineer"
+                disabled={submitting}
               />
-              <p className="text-xs text-muted-foreground">
-                Give your CV a descriptive name to identify it later
-              </p>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="target-job">Target Job</Label>
-              {isLoadingTargetJobs ? (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Loading target jobs...
-                </div>
-              ) : (
-                <Select
-                  value={targetJobId}
-                  onValueChange={setTargetJobId}
-                  disabled={isSubmitting}
-                >
-                  <SelectTrigger id="target-job" className="h-9">
-                    <SelectValue placeholder="Select a target job (optional)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">No target job</SelectItem>
-                    {targetJobs.map((job) => (
-                      <SelectItem key={job.id} value={job.id}>
-                        {job.title}
-                        {job.company && ` at ${job.company}`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-              <p className="text-xs text-muted-foreground">
-                Link this CV to a specific job application (optional)
-              </p>
+              <Label htmlFor="company">Company *</Label>
+              <Input
+                id="company"
+                value={company}
+                onChange={(e) => setCompany(e.target.value)}
+                placeholder="e.g., Google"
+                disabled={submitting}
+              />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="job-description">Job Description</Label>
               <Textarea
                 id="job-description"
-                placeholder="Paste or enter the job description here..."
                 value={jobDescription}
                 onChange={(e) => setJobDescription(e.target.value)}
-                disabled={isSubmitting}
-                className="min-h-[120px]"
+                placeholder="Paste the job description here (optional but recommended)"
+                className="min-h-[200px]"
+                disabled={submitting}
               />
               <p className="text-xs text-muted-foreground">
-                Optional: Add the job description to help tailor your CV. This will be auto-filled if you select a target job with a description.
+                Adding the job description helps us tailor your CV content
               </p>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-3 pt-4">
-              <Button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full sm:w-auto"
-              >
-                {isSubmitting ? (
+            <div className="flex gap-3 justify-end pt-4">
+              <Button variant="outline" asChild disabled={submitting}>
+                <Link href="/cvs">Cancel</Link>
+              </Button>
+              <Button onClick={handleStep1Submit} disabled={submitting}>
+                {submitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Creating...
                   </>
                 ) : (
-                  "Create CV"
+                  <>
+                    Next
+                    <ChevronRight className="ml-2 h-4 w-4" />
+                  </>
                 )}
               </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full sm:w-auto"
-                asChild
-                disabled={isSubmitting}
-              >
-                <Link href="/cvs">Cancel</Link>
-              </Button>
             </div>
-          </form>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
+
+      {step === 2 && (
+        <Card className="rounded-xl border-2">
+          <CardHeader>
+            <CardTitle>Step 2: Select Experiences & Bullets</CardTitle>
+            <CardDescription>
+              Choose which experiences and bullets to include in your CV
+            </CardDescription>
+            {selectedCount.experiences > 0 && (
+              <div className="mt-2 text-sm text-muted-foreground">
+                {selectedCount.experiences} experience{selectedCount.experiences !== 1 ? "s" : ""}{" "}
+                selected • {selectedCount.bullets} bullet{selectedCount.bullets !== 1 ? "s" : ""}{" "}
+                selected
+              </div>
+            )}
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : experiences.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-muted-foreground mb-4">
+                  No experiences found. Create experiences in your master library first.
+                </p>
+                <Button variant="outline" asChild>
+                  <Link href="/experiences">Go to Master Library</Link>
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <ExperienceSelector
+                  experiences={experiences}
+                  selectedExperiences={selectedExperiences}
+                  selectedBullets={selectedBullets}
+                  onExperienceToggle={handleExperienceToggle}
+                  onBulletToggle={handleBulletToggle}
+                />
+
+                <div className="flex gap-3 justify-end pt-4 border-t">
+                  <Button
+                    variant="outline"
+                    onClick={() => setStep(1)}
+                    disabled={submitting}
+                  >
+                    <ChevronLeft className="mr-2 h-4 w-4" />
+                    Previous
+                  </Button>
+                  <Button onClick={handleStep2Submit} disabled={submitting}>
+                    {submitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Creating...
+                      </>
+                    ) : (
+                      "Confirm Selection"
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }
