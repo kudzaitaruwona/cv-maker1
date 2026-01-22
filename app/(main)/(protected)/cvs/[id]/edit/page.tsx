@@ -17,6 +17,21 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion"
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   getCV,
   getCVSections,
   updateCV,
@@ -86,6 +101,9 @@ export default function EditCVPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [showAddExperience, setShowAddExperience] = useState<string | null>(null)
+  const [globalAddDialogOpen, setGlobalAddDialogOpen] = useState(false)
+  const [selectedCategory, setSelectedCategory] = useState<BulletCategories | null>(null)
+  const [loadingExperiences, setLoadingExperiences] = useState(false)
   const [availableExperiences, setAvailableExperiences] = useState<
     Array<MasterExperience & { bullets?: MasterBullet[] }>
   >([])
@@ -130,6 +148,7 @@ export default function EditCVPage() {
 
   const loadAvailableExperiences = async (category: BulletCategories) => {
     try {
+      setLoadingExperiences(true)
       const expData = await getExperiences()
       const categoryExperiences = expData.filter((exp) => exp.type === category)
       
@@ -142,8 +161,84 @@ export default function EditCVPage() {
       
       setAvailableExperiences(experiencesWithBullets)
     } catch (error) {
-      toast.error("Failed to load experiences")
+      toast.error("Failed to load entries")
       console.error(error)
+      setAvailableExperiences([])
+    } finally {
+      setLoadingExperiences(false)
+    }
+  }
+
+  const handleCategorySelect = (category: BulletCategories) => {
+    setSelectedCategory(category)
+    setSelectedExperiences(new Set())
+    setSelectedBullets(new Set())
+    loadAvailableExperiences(category)
+  }
+
+  const handleGlobalAdd = async () => {
+    if (!selectedCategory) {
+      toast.error("Please select a category")
+      return
+    }
+
+    if (selectedExperiences.size === 0) {
+      toast.error("Please select at least one entry")
+      return
+    }
+
+    if (!cvId) {
+      toast.error("CV not found")
+      return
+    }
+
+    try {
+      setSaving(true)
+
+      const experienceSelections = Array.from(selectedExperiences).map((expId) => {
+        const exp = availableExperiences.find((e) => e.id === expId)
+        if (!exp) throw new Error(`Entry ${expId} not found`)
+        return {
+          master_experience_id: expId,
+          master_experience: exp,
+        }
+      })
+
+      const newSections = await addCVSections(cvId, experienceSelections)
+
+      // Add bullets for each new section
+      for (const section of newSections) {
+        const experience = availableExperiences.find(
+          (e) => e.id === section.master_experience_id
+        )
+        if (!experience || !experience.bullets) continue
+
+        const selectedBulletsForExp = experience.bullets.filter((bullet) =>
+          selectedBullets.has(bullet.id)
+        )
+
+        if (selectedBulletsForExp.length > 0) {
+          const bulletSelections = selectedBulletsForExp.map((bullet) => ({
+            master_bullet_id: bullet.id,
+            master_bullet: bullet,
+          }))
+
+          await addCVBullets(section.id, bulletSelections)
+        }
+      }
+
+      toast.success("Entries added successfully")
+      setGlobalAddDialogOpen(false)
+      setSelectedCategory(null)
+      setAvailableExperiences([])
+      setSelectedExperiences(new Set())
+      setSelectedBullets(new Set())
+      loadData()
+    } catch (error) {
+      toast.error("Failed to add entries")
+      console.error(error)
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -197,10 +292,11 @@ export default function EditCVPage() {
       // Update section details
       await updateCVSection(section.id, {
         title: section.title,
-        organization: section.organization,
+        organisation: section.organisation,
         start_date: startDate,
         end_date: endDate,
         location: section.location,
+        link: section.link,
       })
 
       // Update bullets
@@ -267,7 +363,7 @@ export default function EditCVPage() {
 
   const handleAddExperiences = async (category: BulletCategories) => {
     if (selectedExperiences.size === 0) {
-      toast.error("Please select at least one experience")
+      toast.error("Please select at least one entry")
       return
     }
 
@@ -306,13 +402,13 @@ export default function EditCVPage() {
         }
       }
 
-      toast.success("Experiences added successfully")
+      toast.success("Entries added successfully")
       setShowAddExperience(null)
       setSelectedExperiences(new Set())
       setSelectedBullets(new Set())
       loadData()
     } catch (error) {
-      toast.error("Failed to add experiences")
+      toast.error("Failed to add entries")
       console.error(error)
     } finally {
       setSaving(false)
@@ -435,6 +531,150 @@ export default function EditCVPage() {
         </CardContent>
       </Card>
 
+      {/* Global Add New Entry Button */}
+      <Card className="rounded-xl border-2">
+        <CardContent className="p-6">
+          <Dialog
+            open={globalAddDialogOpen}
+            onOpenChange={(open) => {
+              setGlobalAddDialogOpen(open)
+              if (!open) {
+                // Reset state when dialog closes
+                setSelectedCategory(null)
+                setAvailableExperiences([])
+                setSelectedExperiences(new Set())
+                setSelectedBullets(new Set())
+                setLoadingExperiences(false)
+              }
+            }}
+          >
+            <DialogTrigger asChild>
+              <Button className="w-full sm:w-auto">
+                <Plus className="mr-2 h-4 w-4" />
+                Add New Entry
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Add New Entry</DialogTitle>
+                <DialogDescription>
+                  Select a category and choose entries to add to your CV
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-6 mt-4">
+                <div className="space-y-2">
+                  <Label>Select Category</Label>
+                  <Select
+                    value={selectedCategory || ""}
+                    onValueChange={(value) => handleCategorySelect(value as BulletCategories)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose a category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categoryOrder.map((category) => (
+                        <SelectItem key={category} value={category}>
+                          {category}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {selectedCategory && (
+                  <div className="space-y-4">
+                    {loadingExperiences ? (
+                      <div className="flex items-center justify-center py-12">
+                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                        <span className="ml-2 text-sm text-muted-foreground">
+                          Loading entries...
+                        </span>
+                      </div>
+                    ) : availableExperiences.length === 0 ? (
+                      <div className="rounded-lg border-2 border-dashed p-12 text-center">
+                        <p className="text-muted-foreground mb-2">
+                          No entries found for {selectedCategory}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Create entries in your{" "}
+                          <Link
+                            href="/experiences"
+                            className="text-primary hover:underline"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setGlobalAddDialogOpen(false)
+                            }}
+                          >
+                            Master Library
+                          </Link>{" "}
+                          first.
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        <ExperienceSelector
+                          experiences={availableExperiences}
+                          selectedExperiences={selectedExperiences}
+                          selectedBullets={selectedBullets}
+                          onExperienceToggle={(id, checked) => {
+                            const newSet = new Set(selectedExperiences)
+                            if (checked) {
+                              newSet.add(id)
+                            } else {
+                              newSet.delete(id)
+                            }
+                            setSelectedExperiences(newSet)
+                          }}
+                          onBulletToggle={(id, checked) => {
+                            const newSet = new Set(selectedBullets)
+                            if (checked) {
+                              newSet.add(id)
+                            } else {
+                              newSet.delete(id)
+                            }
+                            setSelectedBullets(newSet)
+                          }}
+                        />
+                        <div className="flex justify-end gap-3 pt-4 border-t">
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              setGlobalAddDialogOpen(false)
+                              setSelectedCategory(null)
+                              setSelectedExperiences(new Set())
+                              setSelectedBullets(new Set())
+                            }}
+                            disabled={saving}
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            onClick={handleGlobalAdd}
+                            disabled={saving || selectedExperiences.size === 0}
+                          >
+                            {saving ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Adding...
+                              </>
+                            ) : (
+                              <>
+                                <Plus className="mr-2 h-4 w-4" />
+                                Add Selected
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+        </CardContent>
+      </Card>
+
       {/* CV Sections by Category */}
       <div className="space-y-6">
         {categoryOrder.map((category) => {
@@ -458,7 +698,7 @@ export default function EditCVPage() {
                       }}
                     >
                       <Plus className="mr-2 h-4 w-4" />
-                      Add Experience
+                      Add New {category}
                     </Button>
                   )}
                 </div>
@@ -469,7 +709,7 @@ export default function EditCVPage() {
                     <CardContent className="p-6">
                       <div className="space-y-4">
                         <div className="flex items-center justify-between">
-                          <h3 className="font-semibold">Select Experiences to Add</h3>
+                          <h3 className="font-semibold">Select Entries to Add</h3>
                           <Button
                             variant="ghost"
                             size="sm"
@@ -520,7 +760,7 @@ export default function EditCVPage() {
 
                 {categorySections.length === 0 ? (
                   <p className="text-muted-foreground text-center py-8">
-                    No experiences in this category yet
+                    No entries in this category yet
                   </p>
                 ) : (
                   <Accordion type="multiple" className="space-y-3">
@@ -533,9 +773,9 @@ export default function EditCVPage() {
                         <AccordionTrigger className="hover:no-underline">
                           <div className="flex-1 text-left">
                             <div className="font-medium">{section.title}</div>
-                            {section.organization && (
+                            {section.organisation && (
                               <div className="text-sm text-muted-foreground">
-                                {section.organization}
+                                {section.organisation}
                               </div>
                             )}
                             {singleDateCategories.includes(section.type as BulletCategories) ? (
@@ -574,13 +814,13 @@ export default function EditCVPage() {
                                 />
                               </div>
                               <div className="space-y-2">
-                                <Label>Organization</Label>
+                                <Label>organisation</Label>
                                 <Input
-                                  value={section.organization || ""}
+                                  value={section.organisation || ""}
                                   onChange={(e) => {
                                     const updated = sections.map((s) =>
                                       s.id === section.id
-                                        ? { ...s, organization: e.target.value }
+                                        ? { ...s, organisation: e.target.value }
                                         : s
                                     )
                                     setSections(updated)
@@ -669,6 +909,28 @@ export default function EditCVPage() {
                                     }}
                                   />
                                 </div>
+                              </div>
+                            )}
+
+                            {(section.type === BulletCategories.Projects || section.type === BulletCategories.Certifications) && (
+                              <div className="space-y-2">
+                                <Label>Link</Label>
+                                <Input
+                                  type="url"
+                                  placeholder="https://example.com/project"
+                                  value={section.link || ""}
+                                  onChange={(e) => {
+                                    const updated = sections.map((s) =>
+                                      s.id === section.id
+                                        ? { ...s, link: e.target.value }
+                                        : s
+                                    )
+                                    setSections(updated)
+                                  }}
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                  Link to the project, certification, or related resource
+                                </p>
                               </div>
                             )}
 

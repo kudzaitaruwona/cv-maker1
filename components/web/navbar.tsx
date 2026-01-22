@@ -49,7 +49,7 @@ export function Navbar() {
         Dashboard
       </Link>
       <Link className={buttonVariants({ variant: "ghost" })} href="/experiences">
-        Experiences
+        Entries
       </Link>
       <Link className={buttonVariants({ variant: "ghost" })} href="/bullets">
         Bullets
@@ -118,7 +118,7 @@ export function Navbar() {
                         Dashboard
                       </Link>
                       <Link href="/experiences" className="text-sm font-medium">
-                        Experiences
+                        Entries
                       </Link>
                       <Link href="/bullets" className="text-sm font-medium">
                         Bullets

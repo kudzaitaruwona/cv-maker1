@@ -3,7 +3,7 @@
 // Reference only for understanding data relationships
 
 export enum BulletCategories {
-  Experience = "Experience",
+  Experience = "Work Experience",
   Projects = "Projects",
   Education = "Education",
   Skills = "Skills",
@@ -20,6 +20,7 @@ export type MasterExperience = {
   start_date: string | null; // date
   end_date: string | null; // date
   location: string | null;
+  link: string | null;
   sort_order: number;
   created_at: string;
   updated_at: string;
@@ -62,6 +63,7 @@ export type CVSection = {
   start_date: string | null;
   end_date: string | null;
   location: string | null;
+  link: string | null;
   sort_order: number;
   created_at: string;
 }

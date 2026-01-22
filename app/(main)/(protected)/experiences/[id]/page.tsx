@@ -63,10 +63,11 @@ export default function ExperienceDetailPage() {
   // Form state
   const [formData, setFormData] = useState({
     title: "",
-    organization: "",
+    organisation: "",
     start_date: "",
     end_date: "",
     location: "",
+    link: "",
     type: BulletCategories.Experience,
     is_present: false,
   })
@@ -86,12 +87,14 @@ export default function ExperienceDetailPage() {
       ])
       setExperience(expData)
       setBullets(bulletsData)
+      // Map organisation to organisation for form
       setFormData({
         title: expData.title,
-        organization: expData.organization || "",
+        organisation: expData.organisation || "",
         start_date: expData.start_date || "",
         end_date: expData.end_date || "",
         location: expData.location || "",
+        link: expData.link || "",
         type: expData.type,
         is_present: !expData.end_date,
       })
@@ -122,19 +125,21 @@ export default function ExperienceDetailPage() {
         endDate = formData.is_present ? null : (formData.end_date || null)
       }
       
+      // Map organisation to organisation for database
       const updated = await updateExperience(experienceId, {
         title: formData.title,
-        organization: formData.organization || null,
+        organisation: formData.organisation || null,
         start_date: startDate,
         end_date: endDate,
         location: formData.location || null,
+        link: formData.link || null,
         type: formData.type,
       })
       setExperience(updated)
       setIsEditing(false)
-      toast.success("Experience updated successfully")
+      toast.success("Entry updated successfully")
     } catch (error) {
-      toast.error("Failed to update experience")
+      toast.error("Failed to update entry")
       console.error(error)
     } finally {
       setSaving(false)
@@ -144,10 +149,10 @@ export default function ExperienceDetailPage() {
   const handleDeleteExperience = async () => {
     try {
       await deleteExperience(experienceId)
-      toast.success("Experience deleted successfully")
+      toast.success("Entry deleted successfully")
       router.push("/experiences")
     } catch (error) {
-      toast.error("Failed to delete experience")
+      toast.error("Failed to delete entry")
       console.error(error)
     }
   }
@@ -191,10 +196,11 @@ export default function ExperienceDetailPage() {
 
   const hasChanges = experience && (
     formData.title !== experience.title ||
-    formData.organization !== (experience.organization || "") ||
+    formData.organisation !== (experience.organisation || "") ||
     formData.start_date !== (experience.start_date || "") ||
     formData.end_date !== (experience.end_date || "") ||
     formData.location !== (experience.location || "") ||
+    formData.link !== (experience.link || "") ||
     formData.type !== experience.type ||
     formData.is_present !== !experience.end_date
   )
@@ -221,14 +227,14 @@ export default function ExperienceDetailPage() {
           </Link>
         </Button>
         <div className="flex-1">
-          <h1 className="text-3xl font-bold">Experience Details</h1>
+          <h1 className="text-3xl font-bold">Entry Details</h1>
         </div>
       </div>
 
       <Card className="rounded-xl border-2">
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Experience Information</CardTitle>
+            <CardTitle>Entry Information</CardTitle>
             {!isEditing && (
               <Button variant="outline" onClick={() => setIsEditing(true)}>
                 Edit
@@ -271,11 +277,11 @@ export default function ExperienceDetailPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>Organization</Label>
+                <Label>organisation</Label>
                 <Input
-                  value={formData.organization}
+                  value={formData.organisation}
                   onChange={(e) =>
-                    setFormData({ ...formData, organization: e.target.value })
+                    setFormData({ ...formData, organisation: e.target.value })
                   }
                 />
               </div>
@@ -349,6 +355,23 @@ export default function ExperienceDetailPage() {
                 />
               </div>
 
+              {(formData.type === BulletCategories.Projects || formData.type === BulletCategories.Certifications) && (
+                <div className="space-y-2">
+                  <Label>Link</Label>
+                  <Input
+                    type="url"
+                    placeholder="https://example.com/project"
+                    value={formData.link}
+                    onChange={(e) =>
+                      setFormData({ ...formData, link: e.target.value })
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Link to the project, certification, or related resource
+                  </p>
+                </div>
+              )}
+
               <div className="flex gap-2">
                 <Button
                   onClick={handleSaveExperience}
@@ -378,10 +401,10 @@ export default function ExperienceDetailPage() {
                 <Label className="text-muted-foreground">Title</Label>
                 <p className="font-medium">{experience.title}</p>
               </div>
-              {experience.organization && (
+              {experience.organisation && (
                 <div>
-                  <Label className="text-muted-foreground">Organization</Label>
-                  <p className="font-medium">{experience.organization}</p>
+                  <Label className="text-muted-foreground">organisation</Label>
+                  <p className="font-medium">{experience.organisation}</p>
                 </div>
               )}
               {singleDateCategories.includes(experience.type) ? (
@@ -410,6 +433,21 @@ export default function ExperienceDetailPage() {
                 <div>
                   <Label className="text-muted-foreground">Location</Label>
                   <p className="font-medium">{experience.location}</p>
+                </div>
+              )}
+              {experience.link && (experience.type === BulletCategories.Projects || experience.type === BulletCategories.Certifications) && (
+                <div>
+                  <Label className="text-muted-foreground">Link</Label>
+                  <p className="font-medium">
+                    <a
+                      href={experience.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline"
+                    >
+                      {experience.link}
+                    </a>
+                  </p>
                 </div>
               )}
             </div>
@@ -483,7 +521,7 @@ export default function ExperienceDetailPage() {
           onClick={() => setDeleteDialogOpen(true)}
         >
           <Trash2 className="mr-2 h-4 w-4" />
-          Delete Experience
+          Delete Entry
         </Button>
       </div>
 
@@ -493,7 +531,7 @@ export default function ExperienceDetailPage() {
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
               This action cannot be undone. This will permanently delete the
-              experience "{experience.title}" and all its bullets.
+              entry "{experience.title}" and all its bullets.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -5,12 +5,18 @@ import { useAuth } from "@/context/AuthContext"
 import { getProfile, updateProfile, createProfile, checkUsername } from "@/app/actions/profile"
 import { useForm } from "react-hook-form"
 import { toast } from "sonner"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
 import { 
   User, 
   Bell, 
@@ -18,16 +24,20 @@ import {
   Trash2,
   Save,
   Shield,
-  Pencil,
-  X,
-  Loader2
+  Loader2,
+  Mail,
+  Phone,
+  MapPin,
+  Linkedin,
+  Github,
+  Globe,
+  Image
 } from "lucide-react"
 
 export default function SettingsPage() {
   const { user } = useAuth()
   const [profile, setProfile] = useState<any | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
 
   const form = useForm({
@@ -52,6 +62,13 @@ export default function SettingsPage() {
             first_name: "",
             last_name: "",
             username: "",
+            email: "",
+            phone: "",
+            location: "",
+            linkedin_url: "",
+            github_url: "",
+            portfolio_url: "",
+            avatar_url: "",
           })
         }
       } catch (error) {
@@ -65,65 +82,61 @@ export default function SettingsPage() {
     fetchProfile()
   }, [user, form])
 
-  useEffect(() => {
-    if (profile && !isEditing) {
-      form.reset(profile)
-    }
-  }, [profile, isEditing, form])
 
-  const handleEdit = () => {
-    if (profile) {
-      form.reset(profile)
-      setIsEditing(true)
-    }
+  const cleanFormData = (data: Record<string, any>) => {
+    const cleanData: Record<string, any> = {}
+    Object.keys(data).forEach((key) => {
+      if (
+        key !== "user_id" && 
+        key !== "id" && 
+        key !== "created_at" && 
+        key !== "updated_at"
+      ) {
+        // For required fields, only include if not empty
+        // For optional fields, include even if empty (to allow clearing)
+        const isRequired = ["first_name", "last_name", "username"].includes(key)
+        if (!isRequired || (data[key] !== null && data[key] !== undefined && data[key] !== "")) {
+          cleanData[key] = data[key] === "" ? null : data[key]
+        }
+      }
+    })
+    return cleanData
   }
 
-  const handleCancel = () => {
-    form.reset(profile || {})
-    setIsEditing(false)
-  }
-
-  const onSubmit = async (data: Record<string, any>) => {
+  const saveSection = async (sectionFields: string[]) => {
     if (!user?.id) return
 
     setIsSaving(true)
     try {
-      // Filter out system fields
-      const cleanData: Record<string, any> = {}
-      Object.keys(data).forEach((key) => {
-        if (
-          key !== "user_id" && 
-          key !== "id" && 
-          key !== "created_at" && 
-          key !== "updated_at" && 
-          key !== "avatar_url" &&
-          data[key] !== null &&
-          data[key] !== undefined &&
-          data[key] !== ""
-        ) {
-          cleanData[key] = data[key]
+      const formData = form.getValues()
+      const cleanData = cleanFormData(formData)
+      
+      // Filter to only include fields from this section
+      const sectionData: Record<string, any> = {}
+      sectionFields.forEach((field) => {
+        if (cleanData[field] !== undefined) {
+          sectionData[field] = cleanData[field]
         }
       })
 
       if (profile) {
         // Update existing profile
         const updates: Record<string, any> = {}
-        Object.keys(cleanData).forEach((key) => {
-          if (cleanData[key] !== profile[key]) {
-            updates[key] = cleanData[key]
+        Object.keys(sectionData).forEach((key) => {
+          if (sectionData[key] !== profile[key]) {
+            updates[key] = sectionData[key]
           }
         })
 
         if (Object.keys(updates).length === 0) {
           toast.info("No changes to save")
-          setIsEditing(false)
           setIsSaving(false)
           return
         }
 
         // Check username if it's being updated
         if (updates.username && updates.username !== profile.username) {
-          const isAvailable = await checkUsername(updates.username)
+          const isAvailable = await checkUsername(updates.username, user.id)
           if (!isAvailable) {
             toast.error("Username already taken")
             setIsSaving(false)
@@ -134,31 +147,38 @@ export default function SettingsPage() {
         const updatedProfile = await updateProfile(user.id, updates)
         setProfile(updatedProfile)
         form.reset(updatedProfile)
-        toast.success("Profile updated successfully")
-        setIsEditing(false)
+        toast.success("Section saved successfully")
       } else {
-        // Create new profile - only send first_name, last_name, and username
-        const profileData: Record<string, any> = {}
-        if (cleanData.first_name) profileData.first_name = cleanData.first_name
-        if (cleanData.last_name) profileData.last_name = cleanData.last_name
-        if (cleanData.username) profileData.username = cleanData.username.trim()
-
-        // Ensure at least one required field is provided
-        if (!profileData.first_name && !profileData.last_name && !profileData.username) {
-          toast.error("Please fill in at least one field (First Name, Last Name, or Username)")
+        // Create new profile - required fields: first_name, last_name, username
+        if (!cleanData.first_name || !cleanData.last_name || !cleanData.username) {
+          toast.error("First Name, Last Name, and Username are required")
           setIsSaving(false)
           return
         }
 
-        // Check username if provided
-        if (profileData.username) {
-          const isAvailable = await checkUsername(profileData.username)
-          if (!isAvailable) {
-            toast.error("Username already taken")
-            setIsSaving(false)
-            return
-          }
+        // Check username availability
+        const isAvailable = await checkUsername(cleanData.username.trim())
+        if (!isAvailable) {
+          toast.error("Username already taken")
+          setIsSaving(false)
+          return
         }
+
+        // Build profile data with all fields
+        const profileData: Record<string, any> = {
+          first_name: cleanData.first_name,
+          last_name: cleanData.last_name,
+          username: cleanData.username.trim(),
+        }
+
+        // Add optional fields if provided
+        if (cleanData.email) profileData.email = cleanData.email
+        if (cleanData.phone) profileData.phone = cleanData.phone
+        if (cleanData.location) profileData.location = cleanData.location
+        if (cleanData.linkedin_url) profileData.linkedin_url = cleanData.linkedin_url
+        if (cleanData.github_url) profileData.github_url = cleanData.github_url
+        if (cleanData.portfolio_url) profileData.portfolio_url = cleanData.portfolio_url
+        if (cleanData.avatar_url) profileData.avatar_url = cleanData.avatar_url
 
         const newProfile = await createProfile(profileData)
         setProfile(newProfile)
@@ -173,34 +193,65 @@ export default function SettingsPage() {
     }
   }
 
-  const profileFields = profile ? Object.keys(profile).filter(
-    (key) => key !== "id" && key !== "user_id" && key !== "created_at" && key !== "updated_at" && key !== "avatar_url"
-  ) : []
+  const onSubmit = async (data: Record<string, any>) => {
+    // This is now handled by individual section saves
+    // Keeping for form validation purposes
+  }
+
+  // Define field groups for better organisation
+  const basicFields = ["first_name", "last_name", "username"]
+  const contactFields = ["email", "phone", "location"]
+  const socialFields = ["linkedin_url", "github_url", "portfolio_url"]
+  const avatarField = "avatar_url"
+  
+  const getFieldLabel = (fieldName: string) => {
+    const labels: Record<string, string> = {
+      first_name: "First Name",
+      last_name: "Last Name",
+      username: "Username",
+      email: "Email",
+      phone: "Phone",
+      location: "Location",
+      linkedin_url: "LinkedIn URL",
+      github_url: "GitHub URL",
+      portfolio_url: "Portfolio URL",
+      avatar_url: "Avatar URL",
+    }
+    return labels[fieldName] || fieldName
+      .split("_")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ")
+  }
+
+  const getFieldIcon = (fieldName: string) => {
+    const icons: Record<string, any> = {
+      email: Mail,
+      phone: Phone,
+      location: MapPin,
+      linkedin_url: Linkedin,
+      github_url: Github,
+      portfolio_url: Globe,
+      avatar_url: Image,
+    }
+    return icons[fieldName] || null
+  }
 
   return (
     <div className="space-y-6">
         {/* Page Header */}
         <div className="space-y-2">
           <h1 className="text-3xl font-bold">Settings</h1>
-          <p className="text-muted-foreground">
-            Manage your account settings and preferences
-          </p>
-        </div>
+        <p className="text-muted-foreground">
+          Manage your account settings and preferences
+        </p>
+      </div>
 
         {/* Account Settings */}
         <Card className="rounded-xl border-2 shadow">
           <CardHeader className="p-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <User className="h-5 w-5" />
-                <CardTitle className="text-2xl font-semibold">Account</CardTitle>
-              </div>
-              {!isEditing && profile && (
-                <Button onClick={handleEdit} variant="outline" size="sm">
-                  <Pencil className="mr-2 h-4 w-4" />
-                  Edit
-                </Button>
-              )}
+            <div className="flex items-center gap-2">
+              <User className="h-5 w-5" />
+              <CardTitle className="text-2xl font-semibold">Account Settings</CardTitle>
             </div>
             <CardDescription className="text-sm text-muted-foreground">
               {profile ? "Update your account information" : "Complete your profile setup"}
@@ -216,8 +267,8 @@ export default function SettingsPage() {
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                   {user?.email && (
-                    <div className="space-y-2">
-                      <Label htmlFor="user-email" className="text-sm font-medium">Email</Label>
+                    <div className="space-y-2 mb-6">
+                      <Label htmlFor="user-email" className="text-sm font-medium">Account Email</Label>
                       <Input
                         id="user-email"
                         type="email"
@@ -226,150 +277,287 @@ export default function SettingsPage() {
                         className="h-9"
                       />
                       <p className="text-xs text-muted-foreground">
-                        Email cannot be changed
+                        This is your authentication email and cannot be changed here
                       </p>
                     </div>
                   )}
-                  
-                  {profile ? (
-                    // Show existing profile fields
-                    profileFields.map((fieldName) => {
-                    const fieldValue = profile[fieldName]
-                    const displayName = fieldName
-                      .split("_")
-                      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-                      .join(" ")
 
-                    return (
-                      <FormField
-                        key={fieldName}
-                        control={form.control}
-                        name={fieldName}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-sm font-medium">{displayName}</FormLabel>
-                            <FormControl>
-                              {isEditing ? (
-                                <Input
-                                  {...field}
-                                  type={
-                                    fieldName.includes("email")
-                                      ? "email"
-                                      : fieldName.includes("phone")
-                                      ? "tel"
-                                      : fieldName.includes("date")
-                                      ? "date"
-                                      : "text"
-                                  }
-                                  disabled={isSaving}
-                                  className="h-9"
-                                />
-                              ) : (
-                                <div className="flex h-9 w-full rounded-md border border-input bg-muted px-3 py-1 text-sm">
-                                  {fieldValue !== null && fieldValue !== undefined
-                                    ? String(fieldValue)
-                                    : "Not set"}
-                                </div>
+                  <Accordion type="multiple" className="w-full">
+                    {/* Basic Information */}
+                    <AccordionItem value="basic" className="border rounded-lg px-4 mb-4">
+                      <AccordionTrigger className="hover:no-underline">
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4" />
+                          <span className="text-lg font-semibold">Basic Information</span>
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="pt-4 space-y-4">
+                        {basicFields.map((fieldName) => {
+                          const isRequired = !profile && ["first_name", "last_name", "username"].includes(fieldName)
+                          
+                          return (
+                            <FormField
+                              key={fieldName}
+                              control={form.control}
+                              name={fieldName}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-sm font-medium">
+                                    {getFieldLabel(fieldName)}
+                                    {isRequired && <span className="text-destructive ml-1">*</span>}
+                                  </FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      {...field}
+                                      placeholder={`Enter your ${getFieldLabel(fieldName).toLowerCase()}`}
+                                      disabled={isSaving}
+                                      className="h-9"
+                                      required={isRequired}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
                               )}
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    )
-                  })
-                  ) : (
-                    // Show profile creation form with first_name, last_name, and username
-                    <>
-                      <FormField
-                        control={form.control}
-                        name="first_name"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-sm font-medium">First Name</FormLabel>
-                            <FormControl>
-                              <Input
-                                {...field}
-                                placeholder="Enter your first name"
-                                disabled={isSaving}
-                                className="h-9"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="last_name"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-sm font-medium">Last Name</FormLabel>
-                            <FormControl>
-                              <Input
-                                {...field}
-                                placeholder="Enter your last name"
-                                disabled={isSaving}
-                                className="h-9"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="username"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-sm font-medium">Username</FormLabel>
-                            <FormControl>
-                              <Input
-                                {...field}
-                                placeholder="Enter your username"
-                                disabled={isSaving}
-                                className="h-9"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </>
-                  )}
+                            />
+                          )
+                        })}
+                        <div className="flex justify-end pt-2">
+                          <Button
+                            type="button"
+                            onClick={() => saveSection(basicFields)}
+                            disabled={isSaving}
+                            size="sm"
+                          >
+                            {isSaving ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Saving...
+                              </>
+                            ) : (
+                              <>
+                                <Save className="mr-2 h-4 w-4" />
+                                Save Basic Information
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
 
-                  {(isEditing || !profile) && (
-                    <CardFooter className="px-0 pt-4 flex gap-3">
-                      <Button
-                        type="submit"
-                        disabled={isSaving}
-                        className="flex-1"
-                      >
-                        {isSaving ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Saving...
-                          </>
-                        ) : (
-                          <>
-                            <Save className="mr-2 h-4 w-4" />
-                            Save Changes
-                          </>
-                        )}
-                      </Button>
-                      {profile && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={handleCancel}
-                          disabled={isSaving}
-                        >
-                          <X className="mr-2 h-4 w-4" />
-                          Cancel
-                        </Button>
-                      )}
-                    </CardFooter>
-                  )}
+                    {/* Contact Information */}
+                    <AccordionItem value="contact" className="border rounded-lg px-4 mb-4">
+                      <AccordionTrigger className="hover:no-underline">
+                        <div className="flex items-center gap-2">
+                          <Mail className="h-4 w-4" />
+                          <span className="text-lg font-semibold">Contact Information</span>
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="pt-4 space-y-4">
+                        {contactFields.map((fieldName) => {
+                          const Icon = getFieldIcon(fieldName)
+                          
+                          return (
+                            <FormField
+                              key={fieldName}
+                              control={form.control}
+                              name={fieldName}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-sm font-medium flex items-center gap-2">
+                                    {Icon && <Icon className="h-4 w-4" />}
+                                    {getFieldLabel(fieldName)}
+                                  </FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      {...field}
+                                      type={
+                                        fieldName.includes("email")
+                                          ? "email"
+                                          : fieldName.includes("phone")
+                                          ? "tel"
+                                          : "text"
+                                      }
+                                      placeholder={`Enter your ${getFieldLabel(fieldName).toLowerCase()}`}
+                                      disabled={isSaving}
+                                      className="h-9"
+                                      value={field.value || ""}
+                                      onChange={(e) => field.onChange(e.target.value || null)}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          )
+                        })}
+                        <div className="flex justify-end pt-2">
+                          <Button
+                            type="button"
+                            onClick={() => saveSection(contactFields)}
+                            disabled={isSaving}
+                            size="sm"
+                          >
+                            {isSaving ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Saving...
+                              </>
+                            ) : (
+                              <>
+                                <Save className="mr-2 h-4 w-4" />
+                                Save Contact Information
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+
+                    {/* Social Links */}
+                    <AccordionItem value="social" className="border rounded-lg px-4 mb-4">
+                      <AccordionTrigger className="hover:no-underline">
+                        <div className="flex items-center gap-2">
+                          <Globe className="h-4 w-4" />
+                          <span className="text-lg font-semibold">Social Links</span>
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="pt-4 space-y-4">
+                        {socialFields.map((fieldName) => {
+                          const Icon = getFieldIcon(fieldName)
+                          
+                          return (
+                            <FormField
+                              key={fieldName}
+                              control={form.control}
+                              name={fieldName}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-sm font-medium flex items-center gap-2">
+                                    {Icon && <Icon className="h-4 w-4" />}
+                                    {getFieldLabel(fieldName)}
+                                  </FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      {...field}
+                                      type="url"
+                                      placeholder={`https://${fieldName.replace("_url", "")}.com/yourprofile`}
+                                      disabled={isSaving}
+                                      className="h-9"
+                                      value={field.value || ""}
+                                      onChange={(e) => field.onChange(e.target.value || null)}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          )
+                        })}
+                        <div className="flex justify-end pt-2">
+                          <Button
+                            type="button"
+                            onClick={() => saveSection(socialFields)}
+                            disabled={isSaving}
+                            size="sm"
+                          >
+                            {isSaving ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Saving...
+                              </>
+                            ) : (
+                              <>
+                                <Save className="mr-2 h-4 w-4" />
+                                Save Social Links
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+
+                    {/* Avatar URL */}
+                    <AccordionItem value="avatar" className="border rounded-lg px-4 mb-4">
+                      <AccordionTrigger className="hover:no-underline">
+                        <div className="flex items-center gap-2">
+                          <Image className="h-4 w-4" />
+                          <span className="text-lg font-semibold">Profile Picture</span>
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="pt-4 space-y-4">
+                        <FormField
+                          control={form.control}
+                          name={avatarField}
+                          render={({ field }) => {
+                            const fieldValue = form.watch(avatarField) || profile?.[avatarField]
+                            
+                            return (
+                              <FormItem>
+                                <FormLabel className="text-sm font-medium flex items-center gap-2">
+                                  <Image className="h-4 w-4" />
+                                  {getFieldLabel(avatarField)}
+                                </FormLabel>
+                                <FormControl>
+                                  <div className="space-y-4">
+                                    <Input
+                                      {...field}
+                                      type="url"
+                                      placeholder="https://example.com/avatar.jpg"
+                                      disabled={isSaving}
+                                      className="h-9"
+                                      value={field.value || ""}
+                                      onChange={(e) => field.onChange(e.target.value || null)}
+                                    />
+                                    {fieldValue && (
+                                      <div className="flex items-center gap-4">
+                                        <img
+                                          src={String(fieldValue)}
+                                          alt="Avatar preview"
+                                          className="h-16 w-16 rounded-full object-cover border-2"
+                                          onError={(e) => {
+                                            (e.target as HTMLImageElement).style.display = "none"
+                                          }}
+                                        />
+                                        <p className="text-sm text-muted-foreground">
+                                          Preview will appear here
+                                        </p>
+                                      </div>
+                                    )}
+                                    {!fieldValue && (
+                                      <div className="flex h-16 w-16 rounded-full border-2 border-dashed items-center justify-center text-muted-foreground">
+                                        <User className="h-8 w-8" />
+                                      </div>
+                                    )}
+                                  </div>
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )
+                          }}
+                        />
+                        <div className="flex justify-end pt-2">
+                          <Button
+                            type="button"
+                            onClick={() => saveSection([avatarField])}
+                            disabled={isSaving}
+                            size="sm"
+                          >
+                            {isSaving ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Saving...
+                              </>
+                            ) : (
+                              <>
+                                <Save className="mr-2 h-4 w-4" />
+                                Save Profile Picture
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  </Accordion>
                 </form>
               </Form>
             )}

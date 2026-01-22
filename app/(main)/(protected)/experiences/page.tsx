@@ -45,7 +45,7 @@ export default function ExperiencesPage() {
       const data = await getExperiences()
       setExperiences(data)
     } catch (error) {
-      toast.error("Failed to load experiences")
+      toast.error("Failed to load entries")
       console.error(error)
     } finally {
       setLoading(false)
@@ -55,18 +55,23 @@ export default function ExperiencesPage() {
   const handleCreateExperience = async (data: {
     type: BulletCategories
     title: string
-    organization?: string | null
+    organisation?: string | null
     start_date?: string | null
     end_date?: string | null
     location?: string | null
+    link?: string | null
   }) => {
     try {
-      const newExperience = await createExperience(data)
+      // Map organisation to organisation for database
+      const newExperience = await createExperience({
+        ...data,
+        organisation: data.organisation,
+      })
       setDialogOpen(false)
       router.push(`/experiences/${newExperience.id}`)
-      toast.success("Experience created successfully")
+      toast.success("Entry created successfully")
     } catch (error) {
-      toast.error("Failed to create experience")
+      toast.error("Failed to create entry")
       console.error(error)
     }
   }
@@ -90,21 +95,21 @@ export default function ExperiencesPage() {
         <div>
           <h1 className="text-3xl font-bold">Master Library</h1>
           <p className="text-muted-foreground mt-2">
-            Manage your experiences and achievements
+            Manage your entries and achievements
           </p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="mr-2 h-4 w-4" />
-              Add New Experience
+              Add New Entry
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Create New Experience</DialogTitle>
+              <DialogTitle>Create New Entry</DialogTitle>
               <DialogDescription>
-                Add a new experience to your master library
+                Add a new entry to your master library
               </DialogDescription>
             </DialogHeader>
             <ExperienceForm
@@ -119,11 +124,11 @@ export default function ExperiencesPage() {
         <Card className="rounded-xl border-2 p-12 text-center">
           <CardContent>
             <p className="text-muted-foreground mb-4">
-              No experiences yet. Create your first experience to get started.
+              No entries yet. Create your first entry to get started.
             </p>
             <Button onClick={() => setDialogOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
-              Add Your First Experience
+              Add Your First Entry
             </Button>
           </CardContent>
         </Card>

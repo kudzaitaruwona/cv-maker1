@@ -27,11 +27,12 @@ import { BulletCategories } from "@/app/types/database"
 const experienceSchema = z.object({
   type: z.nativeEnum(BulletCategories),
   title: z.string().min(1, "Title is required").max(200, "Title must be less than 200 characters"),
-  organization: z.string().max(200, "Organization must be less than 200 characters").optional().nullable(),
+  organisation: z.string().max(200, "organisation must be less than 200 characters").optional().nullable(),
   start_date: z.string().optional().nullable(),
   end_date: z.string().optional().nullable(),
   is_present: z.boolean().default(false),
   location: z.string().max(200, "Location must be less than 200 characters").optional().nullable(),
+  link: z.string().url("Must be a valid URL").optional().nullable().or(z.literal("")),
 }).refine((data) => {
   if (data.start_date && data.end_date && !data.is_present) {
     return new Date(data.end_date) >= new Date(data.start_date)
@@ -48,10 +49,11 @@ interface ExperienceFormProps {
   onSubmit: (data: {
     type: BulletCategories
     title: string
-    organization?: string | null
+    organisation?: string | null
     start_date?: string | null
     end_date?: string | null
     location?: string | null
+    link?: string | null
   }) => void | Promise<void>
   onCancel?: () => void
   defaultValues?: Partial<ExperienceFormValues>
@@ -63,11 +65,12 @@ export function ExperienceForm({ onSubmit, onCancel, defaultValues }: Experience
     defaultValues: {
       type: BulletCategories.Experience,
       title: "",
-      organization: null,
+      organisation: null,
       start_date: null,
       end_date: null,
       is_present: false,
       location: null,
+      link: null,
       ...defaultValues,
     },
   })
@@ -82,28 +85,37 @@ export function ExperienceForm({ onSubmit, onCancel, defaultValues }: Experience
     BulletCategories.Skills,
   ]
   const isSingleDateCategory = singleDateCategories.includes(type)
+  
+  // Categories that typically have links
+  const linkCategories = [
+    BulletCategories.Projects,
+    BulletCategories.Certifications,
+  ]
+  const showLinkField = linkCategories.includes(type)
 
   const handleSubmit = (values: ExperienceFormValues) => {
     if (isSingleDateCategory) {
       // For single date categories, use end_date as the award/completion date
       // If end_date is not provided, use start_date
       const dateValue = values.end_date || values.start_date || null
-    onSubmit({
-      type: values.type,
-      title: values.title,
-      organization: values.organization || null,
-      start_date: null,
-      end_date: dateValue,
-      location: values.location || null,
-    })
+      onSubmit({
+        type: values.type,
+        title: values.title,
+        organisation: values.organisation || null,
+        start_date: null,
+        end_date: dateValue,
+        location: values.location || null,
+        link: values.link || null,
+      })
     } else {
       onSubmit({
         type: values.type,
         title: values.title,
-        organization: values.organization || null,
+        organisation: values.organisation || null,
         start_date: values.start_date || null,
         end_date: values.is_present ? null : (values.end_date || null),
         location: values.location || null,
+        link: values.link || null,
       })
     }
   }
@@ -152,10 +164,10 @@ export function ExperienceForm({ onSubmit, onCancel, defaultValues }: Experience
 
         <FormField
           control={form.control}
-          name="organization"
+          name="organisation"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Organization</FormLabel>
+              <FormLabel>organisation</FormLabel>
               <FormControl>
                 <Input
                   placeholder="e.g., Google"
@@ -280,13 +292,38 @@ export function ExperienceForm({ onSubmit, onCancel, defaultValues }: Experience
           )}
         />
 
+        {showLinkField && (
+          <FormField
+            control={form.control}
+            name="link"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Link</FormLabel>
+                <FormControl>
+                  <Input
+                    type="url"
+                    placeholder="https://example.com/project"
+                    {...field}
+                    value={field.value || ""}
+                    onChange={(e) => field.onChange(e.target.value || null)}
+                  />
+                </FormControl>
+                <FormDescription>
+                  Link to the project, certification, or related resource
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
+
         <div className="flex gap-3 justify-end">
           {onCancel && (
             <Button type="button" variant="outline" onClick={onCancel}>
               Cancel
             </Button>
           )}
-          <Button type="submit">Create Experience</Button>
+          <Button type="submit">Create Entry</Button>
         </div>
       </form>
     </Form>

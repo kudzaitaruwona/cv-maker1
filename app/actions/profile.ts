@@ -43,23 +43,25 @@ export async function updateProfile(userId: string, updates: Record<string, any>
   return data;
 }
 
-export async function checkUsername(username:string){
-const { supabase, user } = await getAuthedContext();
+export async function checkUsername(username: string, excludeUserId?: string) {
+  const { supabase, user } = await getAuthedContext();
 
-
-  const { data, error } = await supabase
+  let query = supabase
     .from("Profile")
-    .select("*")
-    .eq("username", username)
-    .maybeSingle();
+    .select("user_id")
+    .eq("username", username);
+
+  // Exclude current user if provided (for updates)
+  if (excludeUserId) {
+    query = query.neq("user_id", excludeUserId);
+  }
+
+  const { data, error } = await query.maybeSingle();
 
   if (error) throw error;
 
-  if(data){
-    return false;
-} else{
-    return true
-}
+  // If data exists, username is taken
+  return !data;
 }
 
 export async function createProfile(profileData: Record<string, any>) {

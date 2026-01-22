@@ -11,7 +11,7 @@ import { StepIndicator } from "@/components/cv/StepIndicator"
 import { ExperienceSelector } from "@/components/cv/ExperienceSelector"
 import Link from "next/link"
 import { toast } from "sonner"
-import { ArrowLeft, Loader2, ChevronRight, ChevronLeft } from "lucide-react"
+import { ArrowLeft, Loader2, ChevronRight, ChevronLeft, Trash2 } from "lucide-react"
 import {
   getExperiences,
   getBullets,
@@ -21,6 +21,7 @@ import {
   createCV,
   createCVSections,
   createCVBullets,
+  deleteCV,
 } from "@/app/actions/cvs"
 import type { MasterExperience, MasterBullet } from "@/app/types/database"
 
@@ -107,7 +108,7 @@ export default function NewCVPage() {
 
   const handleStep2Submit = async () => {
     if (selectedExperiences.size === 0) {
-      toast.error("Please select at least one experience")
+      toast.error("Please select at least one entry")
       return
     }
 
@@ -196,6 +197,30 @@ export default function NewCVPage() {
     setSelectedBullets(newSelected)
   }
 
+  const handleAbandon = async () => {
+    if (!cvId) {
+      // If no CV was created yet, just go back
+      router.push("/cvs")
+      return
+    }
+
+    if (!confirm("Are you sure you want to abandon this CV? This action cannot be undone.")) {
+      return
+    }
+
+    try {
+      setSubmitting(true)
+      await deleteCV(cvId)
+      toast.success("CV abandoned and deleted")
+      router.push("/cvs")
+    } catch (error) {
+      toast.error("Failed to delete CV")
+      console.error(error)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   const selectedCount = {
     experiences: selectedExperiences.size,
     bullets: selectedBullets.size,
@@ -274,7 +299,7 @@ export default function NewCVPage() {
               <Button variant="outline" asChild disabled={submitting}>
                 <Link href="/cvs">Cancel</Link>
               </Button>
-              <Button onClick={handleStep1Submit} disabled={submitting}>
+              <Button onClick={handleStep1Submit} disabled={submitting || !jobTitle.trim() || !company.trim()}>
                 {submitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -293,21 +318,47 @@ export default function NewCVPage() {
       )}
 
       {step === 2 && (
-        <Card className="rounded-xl border-2">
-          <CardHeader>
-            <CardTitle>Step 2: Select Experiences & Bullets</CardTitle>
-            <CardDescription>
-              Choose which experiences and bullets to include in your CV
-            </CardDescription>
-            {selectedCount.experiences > 0 && (
-              <div className="mt-2 text-sm text-muted-foreground">
-                {selectedCount.experiences} experience{selectedCount.experiences !== 1 ? "s" : ""}{" "}
-                selected • {selectedCount.bullets} bullet{selectedCount.bullets !== 1 ? "s" : ""}{" "}
-                selected
+        <>
+          {/* Job Information Summary */}
+          <Card className="rounded-xl border-2 bg-muted/50">
+            <CardHeader>
+              <CardTitle className="text-lg">Job Information</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm text-muted-foreground">Job Title</Label>
+                  <p className="font-medium">{jobTitle || "Not specified"}</p>
+                </div>
+                <div>
+                  <Label className="text-sm text-muted-foreground">Company</Label>
+                  <p className="font-medium">{company || "Not specified"}</p>
+                </div>
+                {jobDescription && (
+                  <div className="md:col-span-2">
+                    <Label className="text-sm text-muted-foreground">Job Description</Label>
+                    <p className="text-sm mt-1 line-clamp-3">{jobDescription}</p>
+                  </div>
+                )}
               </div>
-            )}
-          </CardHeader>
-          <CardContent>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-xl border-2">
+            <CardHeader>
+              <CardTitle>Step 2: Select Entries & Bullets</CardTitle>
+              <CardDescription>
+                Choose which entries and bullets to include in your CV
+              </CardDescription>
+              {selectedCount.experiences > 0 && (
+                <div className="mt-2 text-sm text-muted-foreground">
+                  {selectedCount.experiences} entr{selectedCount.experiences !== 1 ? "ies" : "y"}{" "}
+                  selected • {selectedCount.bullets} bullet{selectedCount.bullets !== 1 ? "s" : ""}{" "}
+                  selected
+                </div>
+              )}
+            </CardHeader>
+            <CardContent>
             {loading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -315,7 +366,7 @@ export default function NewCVPage() {
             ) : experiences.length === 0 ? (
               <div className="text-center py-12">
                 <p className="text-muted-foreground mb-4">
-                  No experiences found. Create experiences in your master library first.
+                  No entries found. Create entries in your master library first.
                 </p>
                 <Button variant="outline" asChild>
                   <Link href="/experiences">Go to Master Library</Link>
@@ -331,30 +382,41 @@ export default function NewCVPage() {
                   onBulletToggle={handleBulletToggle}
                 />
 
-                <div className="flex gap-3 justify-end pt-4 border-t">
+                <div className="flex gap-3 justify-between pt-4 border-t">
                   <Button
-                    variant="outline"
-                    onClick={() => setStep(1)}
+                    variant="destructive"
+                    onClick={handleAbandon}
                     disabled={submitting}
                   >
-                    <ChevronLeft className="mr-2 h-4 w-4" />
-                    Previous
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Abandon CV
                   </Button>
-                  <Button onClick={handleStep2Submit} disabled={submitting}>
-                    {submitting ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Creating...
-                      </>
-                    ) : (
-                      "Confirm Selection"
-                    )}
-                  </Button>
+                  <div className="flex gap-3">
+                    <Button
+                      variant="outline"
+                      onClick={() => setStep(1)}
+                      disabled={submitting}
+                    >
+                      <ChevronLeft className="mr-2 h-4 w-4" />
+                      Previous
+                    </Button>
+                    <Button onClick={handleStep2Submit} disabled={submitting}>
+                      {submitting ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Creating...
+                        </>
+                      ) : (
+                        "Confirm Selection"
+                      )}
+                    </Button>
+                  </div>
                 </div>
               </div>
             )}
           </CardContent>
         </Card>
+        </>
       )}
     </div>
   )

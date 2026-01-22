@@ -4,7 +4,8 @@ import Link from "next/link"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import type { MasterExperience } from "@/app/types/database"
-import { Calendar, MapPin, Building2 } from "lucide-react"
+import { Calendar, MapPin, Building2, ExternalLink } from "lucide-react"
+import { BulletCategories } from "@/app/types/database"
 
 interface ExperienceCardProps {
   experience: MasterExperience
@@ -55,6 +56,22 @@ export function ExperienceCard({ experience }: ExperienceCardProps) {
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <MapPin className="h-4 w-4" />
               <span>{experience.location}</span>
+            </div>
+          )}
+
+          {experience.link && 
+           (experience.type === BulletCategories.Projects || experience.type === BulletCategories.Certifications) && (
+            <div className="flex items-center gap-2 text-sm">
+              <ExternalLink className="h-4 w-4 text-primary" />
+              <a
+                href={experience.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="text-primary hover:underline truncate"
+              >
+                View Link
+              </a>
             </div>
           )}
         </CardContent>

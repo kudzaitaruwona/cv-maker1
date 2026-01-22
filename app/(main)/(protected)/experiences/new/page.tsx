@@ -15,17 +15,22 @@ export default function NewExperiencePage() {
   const handleSubmit = async (data: {
     type: BulletCategories
     title: string
-    organization?: string | null
+    organisation?: string | null
     start_date?: string | null
     end_date?: string | null
     location?: string | null
+    link?: string | null
   }) => {
     try {
-      const newExperience = await createExperience(data)
-      toast.success("Experience created successfully")
+      // Map organisation to organisation for database
+      const newExperience = await createExperience({
+        ...data,
+        organisation: data.organisation,
+      })
+      toast.success("Entry created successfully")
       router.push(`/experiences/${newExperience.id}`)
     } catch (error) {
-      toast.error("Failed to create experience")
+      toast.error("Failed to create entry")
       console.error(error)
     }
   }
@@ -40,9 +45,9 @@ export default function NewExperiencePage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold">Create New Experience</h1>
+          <h1 className="text-3xl font-bold">Create New Entry</h1>
           <p className="text-muted-foreground mt-2">
-            Add a new experience to your master library
+            Add a new entry to your master library
           </p>
         </div>
       </div>

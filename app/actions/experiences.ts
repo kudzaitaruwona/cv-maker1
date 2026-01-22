@@ -72,6 +72,7 @@ export async function createExperience(data: {
   start_date?: string | null;
   end_date?: string | null;
   location?: string | null;
+  link?: string | null;
 }): Promise<MasterExperience> {
   // TODO: Implement Supabase query
   const { supabase, user } = await getAuthedContext();
@@ -98,6 +99,7 @@ export async function createExperience(data: {
       start_date: data.start_date || null,
       end_date: data.end_date || null,
       location: data.location || null,
+      link: data.link || null,
       sort_order: sortOrder,
     })
     .select()
@@ -117,6 +119,7 @@ export async function updateExperience(
     start_date: string | null;
     end_date: string | null;
     location: string | null;
+    link: string | null;
     sort_order: number;
   }>
 ): Promise<MasterExperience> {
