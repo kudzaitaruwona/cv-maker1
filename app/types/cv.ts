@@ -50,7 +50,7 @@ type MasterExperience = {
   user_id: string;
   type: 'Experience' | 'Projects' | 'Education' | 'Skills' | 'Certifications' | 'Other';
   title: string;
-  organization: string | null;
+  organisation: string | null;
   start_date: string | null; // date
   end_date: string | null; // date
   location: string | null;
@@ -92,7 +92,7 @@ type CVSection1 = {
   master_experience_id: string | null;
   type: string;
   title: string;
-  organization: string | null;
+  organisation: string | null;
   start_date: string | null;
   end_date: string | null;
   location: string | null;

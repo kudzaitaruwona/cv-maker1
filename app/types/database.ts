@@ -16,7 +16,7 @@ export type MasterExperience = {
   user_id: string;
   type: BulletCategories;
   title: string;
-  organization: string | null;
+  organisation: string | null;
   start_date: string | null; // date
   end_date: string | null; // date
   location: string | null;
@@ -58,7 +58,7 @@ export type CVSection = {
   master_experience_id: string | null;
   type: string;
   title: string;
-  organization: string | null;
+  organisation: string | null;
   start_date: string | null;
   end_date: string | null;
   location: string | null;

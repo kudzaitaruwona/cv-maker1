@@ -26,6 +26,13 @@ import {
 import type { MasterExperience, MasterBullet } from "@/app/types/database"
 import { BulletCategories } from "@/app/types/database"
 import { ArrowLeft, Plus, Save, Trash2, Loader2 } from "lucide-react"
+
+// Categories that only need a single date (award/completion date)
+const singleDateCategories = [
+  BulletCategories.Projects,
+  BulletCategories.Certifications,
+  BulletCategories.Skills,
+]
 import { toast } from "sonner"
 import Link from "next/link"
 import {
@@ -100,11 +107,26 @@ export default function ExperienceDetailPage() {
   const handleSaveExperience = async () => {
     try {
       setSaving(true)
+      const isSingleDateCategory = singleDateCategories.includes(formData.type)
+      
+      let startDate: string | null = null
+      let endDate: string | null = null
+      
+      if (isSingleDateCategory) {
+        // For single date categories, use end_date as the award/completion date
+        // If end_date is not provided, use start_date
+        endDate = formData.end_date || formData.start_date || null
+        startDate = null
+      } else {
+        startDate = formData.start_date || null
+        endDate = formData.is_present ? null : (formData.end_date || null)
+      }
+      
       const updated = await updateExperience(experienceId, {
         title: formData.title,
         organization: formData.organization || null,
-        start_date: formData.start_date || null,
-        end_date: formData.is_present ? null : (formData.end_date || null),
+        start_date: startDate,
+        end_date: endDate,
         location: formData.location || null,
         type: formData.type,
       })
@@ -258,42 +280,64 @@ export default function ExperienceDetailPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              {singleDateCategories.includes(formData.type) ? (
                 <div className="space-y-2">
-                  <Label>Start Date</Label>
+                  <Label>Date Awarded / Completion Date</Label>
                   <Input
                     type="date"
-                    value={formData.start_date}
+                    value={formData.end_date || formData.start_date || ""}
                     onChange={(e) =>
-                      setFormData({ ...formData, start_date: e.target.value })
+                      setFormData({
+                        ...formData,
+                        end_date: e.target.value,
+                        start_date: "",
+                      })
                     }
                   />
+                  <p className="text-xs text-muted-foreground">
+                    The date this was awarded or completed
+                  </p>
                 </div>
-                <div className="space-y-2">
-                  <Label>End Date</Label>
-                  <Input
-                    type="date"
-                    disabled={formData.is_present}
-                    value={formData.end_date}
-                    onChange={(e) =>
-                      setFormData({ ...formData, end_date: e.target.value })
-                    }
-                  />
-                </div>
-              </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Start Date</Label>
+                      <Input
+                        type="date"
+                        value={formData.start_date}
+                        onChange={(e) =>
+                          setFormData({ ...formData, start_date: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>End Date</Label>
+                      <Input
+                        type="date"
+                        disabled={formData.is_present}
+                        value={formData.end_date}
+                        onChange={(e) =>
+                          setFormData({ ...formData, end_date: e.target.value })
+                        }
+                      />
+                    </div>
+                  </div>
 
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="is_present"
-                  checked={formData.is_present}
-                  onChange={(e) =>
-                    setFormData({ ...formData, is_present: e.target.checked })
-                  }
-                  className="h-4 w-4"
-                />
-                <Label htmlFor="is_present">Currently working here</Label>
-              </div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="is_present"
+                      checked={formData.is_present}
+                      onChange={(e) =>
+                        setFormData({ ...formData, is_present: e.target.checked })
+                      }
+                      className="h-4 w-4"
+                    />
+                    <Label htmlFor="is_present">Currently working here</Label>
+                  </div>
+                </>
+              )}
 
               <div className="space-y-2">
                 <Label>Location</Label>
@@ -340,16 +384,27 @@ export default function ExperienceDetailPage() {
                   <p className="font-medium">{experience.organization}</p>
                 </div>
               )}
-              {experience.start_date && (
-                <div>
-                  <Label className="text-muted-foreground">Date Range</Label>
-                  <p className="font-medium">
-                    {new Date(experience.start_date).toLocaleDateString()} -{" "}
-                    {experience.end_date
-                      ? new Date(experience.end_date).toLocaleDateString()
-                      : "Present"}
-                  </p>
-                </div>
+              {singleDateCategories.includes(experience.type) ? (
+                (experience.end_date || experience.start_date) && (
+                  <div>
+                    <Label className="text-muted-foreground">Date Awarded / Completion Date</Label>
+                    <p className="font-medium">
+                      {new Date(experience.end_date || experience.start_date!).toLocaleDateString()}
+                    </p>
+                  </div>
+                )
+              ) : (
+                experience.start_date && (
+                  <div>
+                    <Label className="text-muted-foreground">Date Range</Label>
+                    <p className="font-medium">
+                      {new Date(experience.start_date).toLocaleDateString()} -{" "}
+                      {experience.end_date
+                        ? new Date(experience.end_date).toLocaleDateString()
+                        : "Present"}
+                    </p>
+                  </div>
+                )
               )}
               {experience.location && (
                 <div>

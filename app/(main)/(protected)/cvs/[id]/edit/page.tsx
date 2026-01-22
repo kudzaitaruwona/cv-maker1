@@ -69,6 +69,13 @@ const categoryOrder: BulletCategories[] = [
   BulletCategories.Other,
 ]
 
+// Categories that only need a single date (award/completion date)
+const singleDateCategories = [
+  BulletCategories.Projects,
+  BulletCategories.Certifications,
+  BulletCategories.Skills,
+]
+
 export default function EditCVPage() {
   const params = useParams()
   const router = useRouter()
@@ -172,12 +179,27 @@ export default function EditCVPage() {
     try {
       setSaving(true)
 
+      const isSingleDateCategory = singleDateCategories.includes(section.type as BulletCategories)
+      
+      let startDate: string | null = null
+      let endDate: string | null = null
+      
+      if (isSingleDateCategory) {
+        // For single date categories, use end_date as the award/completion date
+        // If end_date is not provided, use start_date
+        endDate = section.end_date || section.start_date || null
+        startDate = null
+      } else {
+        startDate = section.start_date || null
+        endDate = section.end_date || null
+      }
+
       // Update section details
       await updateCVSection(section.id, {
         title: section.title,
         organization: section.organization,
-        start_date: section.start_date,
-        end_date: section.end_date,
+        start_date: startDate,
+        end_date: endDate,
         location: section.location,
       })
 
@@ -516,13 +538,21 @@ export default function EditCVPage() {
                                 {section.organization}
                               </div>
                             )}
-                            {section.start_date && (
-                              <div className="text-xs text-muted-foreground">
-                                {new Date(section.start_date).toLocaleDateString()} -{" "}
-                                {section.end_date
-                                  ? new Date(section.end_date).toLocaleDateString()
-                                  : "Present"}
-                              </div>
+                            {singleDateCategories.includes(section.type as BulletCategories) ? (
+                              (section.end_date || section.start_date) && (
+                                <div className="text-xs text-muted-foreground">
+                                  {new Date(section.end_date || section.start_date!).toLocaleDateString()}
+                                </div>
+                              )
+                            ) : (
+                              section.start_date && (
+                                <div className="text-xs text-muted-foreground">
+                                  {new Date(section.start_date).toLocaleDateString()} -{" "}
+                                  {section.end_date
+                                    ? new Date(section.end_date).toLocaleDateString()
+                                    : "Present"}
+                                </div>
+                              )
                             )}
                           </div>
                         </AccordionTrigger>
@@ -558,52 +588,89 @@ export default function EditCVPage() {
                                 />
                               </div>
                             </div>
-                            <div className="grid grid-cols-3 gap-4">
-                              <div className="space-y-2">
-                                <Label>Start Date</Label>
-                                <Input
-                                  type="date"
-                                  value={section.start_date || ""}
-                                  onChange={(e) => {
-                                    const updated = sections.map((s) =>
-                                      s.id === section.id
-                                        ? { ...s, start_date: e.target.value }
-                                        : s
-                                    )
-                                    setSections(updated)
-                                  }}
-                                />
+                            {singleDateCategories.includes(section.type as BulletCategories) ? (
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                  <Label>Date Awarded / Completion Date</Label>
+                                  <Input
+                                    type="date"
+                                    value={section.end_date || section.start_date || ""}
+                                    onChange={(e) => {
+                                      const updated = sections.map((s) =>
+                                        s.id === section.id
+                                          ? { ...s, end_date: e.target.value, start_date: null }
+                                          : s
+                                      )
+                                      setSections(updated)
+                                    }}
+                                  />
+                                  <p className="text-xs text-muted-foreground">
+                                    The date this was awarded or completed
+                                  </p>
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>Location</Label>
+                                  <Input
+                                    value={section.location || ""}
+                                    onChange={(e) => {
+                                      const updated = sections.map((s) =>
+                                        s.id === section.id
+                                          ? { ...s, location: e.target.value }
+                                          : s
+                                      )
+                                      setSections(updated)
+                                    }}
+                                  />
+                                </div>
                               </div>
-                              <div className="space-y-2">
-                                <Label>End Date</Label>
-                                <Input
-                                  type="date"
-                                  value={section.end_date || ""}
-                                  onChange={(e) => {
-                                    const updated = sections.map((s) =>
-                                      s.id === section.id
-                                        ? { ...s, end_date: e.target.value }
-                                        : s
-                                    )
-                                    setSections(updated)
-                                  }}
-                                />
+                            ) : (
+                              <div className="grid grid-cols-3 gap-4">
+                                <div className="space-y-2">
+                                  <Label>Start Date</Label>
+                                  <Input
+                                    type="date"
+                                    value={section.start_date || ""}
+                                    onChange={(e) => {
+                                      const updated = sections.map((s) =>
+                                        s.id === section.id
+                                          ? { ...s, start_date: e.target.value }
+                                          : s
+                                      )
+                                      setSections(updated)
+                                    }}
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>End Date</Label>
+                                  <Input
+                                    type="date"
+                                    value={section.end_date || ""}
+                                    onChange={(e) => {
+                                      const updated = sections.map((s) =>
+                                        s.id === section.id
+                                          ? { ...s, end_date: e.target.value }
+                                          : s
+                                      )
+                                      setSections(updated)
+                                    }}
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>Location</Label>
+                                  <Input
+                                    value={section.location || ""}
+                                    onChange={(e) => {
+                                      const updated = sections.map((s) =>
+                                        s.id === section.id
+                                          ? { ...s, location: e.target.value }
+                                          : s
+                                      )
+                                      setSections(updated)
+                                    }}
+                                  />
+                                </div>
                               </div>
-                              <div className="space-y-2">
-                                <Label>Location</Label>
-                                <Input
-                                  value={section.location || ""}
-                                  onChange={(e) => {
-                                    const updated = sections.map((s) =>
-                                      s.id === section.id
-                                        ? { ...s, location: e.target.value }
-                                        : s
-                                    )
-                                    setSections(updated)
-                                  }}
-                                />
-                              </div>
-                            </div>
+                            )}
 
                             <div className="space-y-2">
                               <Label>Bullets</Label>

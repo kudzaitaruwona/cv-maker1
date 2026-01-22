@@ -282,7 +282,7 @@ export async function createCVSections(
   //   master_experience_id: sel.master_experience_id,
   //   type: sel.master_experience.type,
   //   title: sel.master_experience.title,
-  //   organization: sel.master_experience.organization,
+  //   organisation: sel.master_experience.organisation,
   //   start_date: sel.master_experience.start_date,
   //   end_date: sel.master_experience.end_date,
   //   location: sel.master_experience.location,
@@ -369,7 +369,7 @@ export async function updateCVSection(
   id: string,
   updates: Partial<{
     title: string;
-    organization: string | null;
+    organisation: string | null;
     start_date: string | null;
     end_date: string | null;
     location: string | null;

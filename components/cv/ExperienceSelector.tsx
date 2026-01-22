@@ -109,9 +109,9 @@ export function ExperienceSelector({
                         <AccordionTrigger className="flex-1 hover:no-underline py-0">
                           <div className="flex-1 text-left">
                             <div className="font-medium">{experience.title}</div>
-                            {experience.organization && (
+                            {experience.organisation && (
                               <div className="text-sm text-muted-foreground">
-                                {experience.organization}
+                                {experience.organisation}
                               </div>
                             )}
                             {experience.start_date && (

@@ -442,7 +442,7 @@ export async function createDummyTargetJobs(count: number = 5) {
     "We are looking for a skilled software engineer to join our dynamic team. You will be responsible for developing and maintaining web applications, collaborating with cross-functional teams, and contributing to our product roadmap.",
     "Join our team as a Senior Software Engineer and lead the development of cutting-edge solutions. You'll work on challenging problems, mentor junior developers, and help shape our technical direction.",
     "We're seeking a Full Stack Developer to build end-to-end features for our platform. You'll work with modern technologies and have the opportunity to make a significant impact on our product.",
-    "As a Data Scientist, you'll analyze complex datasets, build predictive models, and help drive data-driven decision making across the organization.",
+    "As a Data Scientist, you'll analyze complex datasets, build predictive models, and help drive data-driven decision making across the organisation.",
     "We need a Product Manager to own product strategy and execution. You'll work closely with engineering, design, and stakeholders to deliver exceptional user experiences.",
   ];
   

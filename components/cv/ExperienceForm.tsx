@@ -72,17 +72,40 @@ export function ExperienceForm({ onSubmit, onCancel, defaultValues }: Experience
     },
   })
 
+  const type = form.watch("type")
   const isPresent = form.watch("is_present")
 
+  // Categories that only need a single date (award/completion date)
+  const singleDateCategories = [
+    BulletCategories.Projects,
+    BulletCategories.Certifications,
+    BulletCategories.Skills,
+  ]
+  const isSingleDateCategory = singleDateCategories.includes(type)
+
   const handleSubmit = (values: ExperienceFormValues) => {
+    if (isSingleDateCategory) {
+      // For single date categories, use end_date as the award/completion date
+      // If end_date is not provided, use start_date
+      const dateValue = values.end_date || values.start_date || null
     onSubmit({
       type: values.type,
       title: values.title,
       organization: values.organization || null,
-      start_date: values.start_date || null,
-      end_date: values.is_present ? null : (values.end_date || null),
+      start_date: null,
+      end_date: dateValue,
       location: values.location || null,
     })
+    } else {
+      onSubmit({
+        type: values.type,
+        title: values.title,
+        organization: values.organization || null,
+        start_date: values.start_date || null,
+        end_date: values.is_present ? null : (values.end_date || null),
+        location: values.location || null,
+      })
+    }
   }
 
   return (
@@ -146,67 +169,97 @@ export function ExperienceForm({ onSubmit, onCancel, defaultValues }: Experience
           )}
         />
 
-        <div className="grid grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="start_date"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Start Date</FormLabel>
-                <FormControl>
-                  <Input
-                    type="date"
-                    {...field}
-                    value={field.value || ""}
-                    onChange={(e) => field.onChange(e.target.value || null)}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
+        {isSingleDateCategory ? (
           <FormField
             control={form.control}
             name="end_date"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>End Date</FormLabel>
+                <FormLabel>Date Awarded / Completion Date</FormLabel>
                 <FormControl>
                   <Input
                     type="date"
-                    disabled={isPresent}
                     {...field}
-                    value={field.value || ""}
-                    onChange={(e) => field.onChange(e.target.value || null)}
+                    value={field.value || form.watch("start_date") || ""}
+                    onChange={(e) => {
+                      field.onChange(e.target.value || null)
+                      // Also update start_date for consistency
+                      form.setValue("start_date", null)
+                    }}
                   />
                 </FormControl>
+                <FormDescription>
+                  The date this was awarded or completed
+                </FormDescription>
                 <FormMessage />
               </FormItem>
             )}
           />
-        </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="start_date"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Start Date</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="date"
+                        {...field}
+                        value={field.value || ""}
+                        onChange={(e) => field.onChange(e.target.value || null)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-        <FormField
-          control={form.control}
-          name="is_present"
-          render={({ field }) => (
-            <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-              <FormControl>
-                <Checkbox
-                  checked={field.value}
-                  onCheckedChange={field.onChange}
-                />
-              </FormControl>
-              <div className="space-y-1 leading-none">
-                <FormLabel>Currently working here</FormLabel>
-                <FormDescription>
-                  Check this if you are still in this role
-                </FormDescription>
-              </div>
-            </FormItem>
-          )}
-        />
+              <FormField
+                control={form.control}
+                name="end_date"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>End Date</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="date"
+                        disabled={isPresent}
+                        {...field}
+                        value={field.value || ""}
+                        onChange={(e) => field.onChange(e.target.value || null)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <FormField
+              control={form.control}
+              name="is_present"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel>Currently working here</FormLabel>
+                    <FormDescription>
+                      Check this if you are still in this role
+                    </FormDescription>
+                  </div>
+                </FormItem>
+              )}
+            />
+          </>
+        )}
 
         <FormField
           control={form.control}

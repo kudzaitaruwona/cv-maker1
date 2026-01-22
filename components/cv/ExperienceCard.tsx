@@ -37,10 +37,10 @@ export function ExperienceCard({ experience }: ExperienceCardProps) {
             <Badge variant="outline">{experience.type}</Badge>
           </div>
 
-          {experience.organization && (
+          {experience.organisation && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Building2 className="h-4 w-4" />
-              <span>{experience.organization}</span>
+              <span>{experience.organisation}</span>
             </div>
           )}
 
