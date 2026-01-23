@@ -1,10 +1,8 @@
 "use client"
 
-import { createContext, useContext, useEffect, useState } from "react"
+import { createContext, useContext, useEffect, useState, useMemo } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useAuth } from "./AuthContext"
-
-const supabase = createClient()
 
 interface ProfileContextType {
   profile: any | null
@@ -22,43 +20,64 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth()
   const [profile, setProfile] = useState<any | null>(null)
 
+  // Create client lazily inside the component to avoid module-level initialization
+  // This ensures env vars are available when the component mounts
+  const supabase = useMemo(() => {
+    try {
+      return createClient()
+    } catch (error) {
+      // If env vars are missing, log error but don't crash the app
+      console.error("Failed to create Supabase client:", error)
+      return null
+    }
+  }, [])
+
   const fetchProfile = async () => {
-    if (!user) {
+    if (!user || !supabase) {
       return
     }
 
-    const { data, error } = await supabase
-      .from("Profile")
-      .select("*")
-      .eq("user_id", user.id)
-      .single()
+    try {
+      const { data, error } = await supabase
+        .from("Profile")
+        .select("*")
+        .eq("user_id", user.id)
+        .single()
 
-    if (!error) {
-      setProfile(data)
+      if (!error) {
+        setProfile(data)
+      }
+    } catch (error) {
+      console.error("Failed to fetch profile:", error)
     }
   }
 
   useEffect(() => {
     fetchProfile()
-  }, [user])
+  }, [user, supabase])
 
   const updateProfile = async (updates: Record<string, any>) => {
-    if (!user) {
-      return { error: { message: "User not authenticated" } }
+    if (!user || !supabase) {
+      return { error: { message: "User not authenticated or Supabase not configured" } }
     }
 
-    const { data, error } = await supabase
-      .from("Profile")
-      .update(updates)
-      .eq("user_id", user.id)
-      .select()
-      .single()
+    try {
+      const { data, error } = await supabase
+        .from("Profile")
+        .update(updates)
+        .eq("user_id", user.id)
+        .select()
+        .single()
 
-    if (!error && data) {
-      setProfile(data)
+      if (!error && data) {
+        setProfile(data)
+      }
+
+      return { error }
+    } catch (error) {
+      console.error("Failed to update profile:", error)
+      return { error }
     }
-
-    return { error }
   }
 
   const refreshProfile = async () => {

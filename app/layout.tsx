@@ -6,10 +6,28 @@ import { Navbar } from "@/components/web/navbar";
 import { AuthProvider } from "@/context/AuthContext"
 import { ProfileProvider } from "@/context/ProfileContext";
 import { Toaster } from "sonner";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
-const defaultUrl = process.env.VERCEL_URL
-  ? `https://${process.env.VERCEL_URL}`
-  : "http://localhost:3000";
+// Construct the base URL for metadata
+// VERCEL_URL is available at build and runtime (server-side only)
+// It contains the domain without protocol (e.g., "my-site.vercel.app")
+// For production, prefer VERCEL_PROJECT_PRODUCTION_URL if available
+function getDefaultUrl(): string {
+  // Production URL (if available)
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+    return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+  }
+  
+  // Preview or development deployment
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  
+  // Local development
+  return "http://localhost:3000";
+}
+
+const defaultUrl = getDefaultUrl();
 
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
@@ -21,6 +39,7 @@ const geistSans = Geist({
   variable: "--font-geist-sans",
   display: "swap",
   subsets: ["latin"],
+  fallback: ["system-ui", "arial"], // Fallback fonts if Geist fails to load
 });
 
 export default function RootLayout({
@@ -37,10 +56,12 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <AuthProvider>
-              <Toaster/>
-              {children}
-          </AuthProvider>
+          <ErrorBoundary>
+            <AuthProvider>
+                <Toaster/>
+                {children}
+            </AuthProvider>
+          </ErrorBoundary>
         </ThemeProvider>
       </body>
     </html>

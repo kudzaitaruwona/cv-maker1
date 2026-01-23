@@ -1,6 +1,13 @@
 import { updateSession } from "@/lib/supabase/proxy";
 import { type NextRequest } from "next/server";
 
+/**
+ * Next.js proxy for handling Supabase authentication and session management.
+ * This runs on every request and refreshes the user's session if needed.
+ * 
+ * In Next.js 16, the middleware convention has been renamed to "proxy".
+ * This file must be named proxy.ts and export a function named "proxy".
+ */
 export async function proxy(request: NextRequest) {
   return await updateSession(request);
 }

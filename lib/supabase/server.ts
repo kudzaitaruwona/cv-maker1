@@ -1,17 +1,29 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { getSupabaseUrl, getSupabasePublishableKey, hasSupabaseEnvVars } from "../env";
 
 /**
  * Especially important if using Fluid compute: Don't put this client in a
  * global variable. Always create a new client within each function when using
  * it.
+ * 
+ * @throws {Error} If required Supabase environment variables are not set
  */
 export async function createClient() {
+  // Check if env vars are set before attempting to create client
+  if (!hasSupabaseEnvVars()) {
+    throw new Error(
+      "Supabase environment variables are not configured. " +
+      "Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY " +
+      "in your .env.local file or Vercel project settings."
+    );
+  }
+
   const cookieStore = await cookies();
 
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    getSupabaseUrl(),
+    getSupabasePublishableKey(),
     {
       cookies: {
         getAll() {

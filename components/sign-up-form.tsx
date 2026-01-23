@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
+import { getRedirectUrl } from "@/lib/redirect-url";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -41,11 +42,13 @@ export function SignUpForm({
     }
 
     try {
+      const redirectUrl = getRedirectUrl("/dashboard");
+      
       const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/dashboard`,
+          emailRedirectTo: redirectUrl,
         },
       });
       if (error) throw error;

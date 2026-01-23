@@ -2,6 +2,10 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Suspense } from "react";
 
+// Force dynamic rendering - protected routes require authentication which needs cookies()
+// This prevents Next.js from trying to prerender these routes at build time
+export const dynamic = "force-dynamic";
+
 async function AuthCheck({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getUser();

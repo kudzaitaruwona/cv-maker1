@@ -30,7 +30,7 @@ const experienceSchema = z.object({
   organisation: z.string().max(200, "organisation must be less than 200 characters").optional().nullable(),
   start_date: z.string().optional().nullable(),
   end_date: z.string().optional().nullable(),
-  is_present: z.boolean().default(false),
+  is_present: z.boolean(),
   location: z.string().max(200, "Location must be less than 200 characters").optional().nullable(),
   link: z.string().url("Must be a valid URL").optional().nullable().or(z.literal("")),
 }).refine((data) => {
