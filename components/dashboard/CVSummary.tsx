@@ -58,7 +58,7 @@ export function CVSummary({ summary }: Props) {
                     </div>
                   </div>
                   <Button asChild variant="outline" size="sm">
-                    <Link href={`/cvs/${cv.id}/edit`}>Open</Link>
+                    <Link href={`/cvs/${cv.id}`}>Open</Link>
                   </Button>
                 </li>
               ))}

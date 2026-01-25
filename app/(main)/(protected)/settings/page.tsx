@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import {
@@ -31,7 +32,8 @@ import {
   Linkedin,
   Github,
   Globe,
-  Image
+  Image,
+  FileText
 } from "lucide-react"
 
 export default function SettingsPage() {
@@ -202,6 +204,7 @@ export default function SettingsPage() {
   const basicFields = ["first_name", "last_name", "username"]
   const contactFields = ["email", "phone", "location"]
   const socialFields = ["linkedin_url", "github_url", "portfolio_url"]
+  const summaryField = "summary"
   const avatarField = "avatar_url"
   
   const getFieldLabel = (fieldName: string) => {
@@ -215,6 +218,7 @@ export default function SettingsPage() {
       linkedin_url: "LinkedIn URL",
       github_url: "GitHub URL",
       portfolio_url: "Portfolio URL",
+      summary: "Professional Summary",
       avatar_url: "Avatar URL",
     }
     return labels[fieldName] || fieldName
@@ -469,6 +473,65 @@ export default function SettingsPage() {
                               <>
                                 <Save className="mr-2 h-4 w-4" />
                                 Save Social Links
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+
+                    {/* Professional Summary */}
+                    <AccordionItem value="summary" className="border rounded-lg px-4 mb-4">
+                      <AccordionTrigger className="hover:no-underline">
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-4 w-4" />
+                          <span className="text-lg font-semibold">Professional Summary</span>
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="pt-4 space-y-4">
+                        <FormField
+                          control={form.control}
+                          name={summaryField}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-sm font-medium flex items-center gap-2">
+                                <FileText className="h-4 w-4" />
+                                {getFieldLabel(summaryField)}
+                                <span className="text-xs text-muted-foreground font-normal">(Recommended)</span>
+                              </FormLabel>
+                              <FormControl>
+                                <Textarea
+                                  {...field}
+                                  placeholder="Write a brief professional summary highlighting your key qualifications and career objectives..."
+                                  disabled={isSaving}
+                                  className="min-h-[120px]"
+                                  value={field.value || ""}
+                                  onChange={(e) => field.onChange(e.target.value || null)}
+                                />
+                              </FormControl>
+                              <p className="text-xs text-muted-foreground">
+                                A well-written summary helps recruiters quickly understand your value proposition. This summary can be used across your CVs.
+                              </p>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <div className="flex justify-end pt-2">
+                          <Button
+                            type="button"
+                            onClick={() => saveSection([summaryField])}
+                            disabled={isSaving}
+                            size="sm"
+                          >
+                            {isSaving ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Saving...
+                              </>
+                            ) : (
+                              <>
+                                <Save className="mr-2 h-4 w-4" />
+                                Save Summary
                               </>
                             )}
                           </Button>

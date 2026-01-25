@@ -7,7 +7,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
 import { BulletItem } from "@/components/cv/BulletItem"
 import { ExperienceSelector } from "@/components/cv/ExperienceSelector"
 import {
@@ -43,15 +42,15 @@ import {
   addCVSections,
   addCVBullets,
   runATSScore,
-  exportPDF,
 } from "@/app/actions/cvs"
 import { getExperiences, getBullets } from "@/app/actions/experiences"
 import type {
   CVWithDetails,
   CVSectionWithBullets,
   CVBullet,
+  MasterExperience,
+  MasterBullet,
 } from "@/app/types/database"
-import type { MasterExperience, MasterBullet } from "@/app/types/database"
 import { BulletCategories } from "@/app/types/database"
 import {
   ArrowLeft,
@@ -64,16 +63,6 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import Link from "next/link"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 
 const categoryOrder: BulletCategories[] = [
   BulletCategories.Experience,
@@ -91,7 +80,7 @@ const singleDateCategories = [
   BulletCategories.Skills,
 ]
 
-export default function EditCVPage() {
+export default function CVPage() {
   const params = useParams()
   const router = useRouter()
   const cvId = params.id as string
@@ -112,6 +101,7 @@ export default function EditCVPage() {
 
   // Form state
   const [cvTitle, setCVTitle] = useState("")
+  const [cvSummary, setCVSummary] = useState("")
   const [targetJobTitle, setTargetJobTitle] = useState("")
   const [targetCompany, setTargetCompany] = useState("")
   const [targetDescription, setTargetDescription] = useState("")
@@ -132,6 +122,7 @@ export default function EditCVPage() {
       setCV(cvData)
       setSections(sectionsData)
       setCVTitle(cvData.title)
+      setCVSummary(cvData.summary || "")
       if (cvData.target_position) {
         setTargetJobTitle(cvData.target_position.title)
         setTargetCompany(cvData.target_position.company)
@@ -248,8 +239,11 @@ export default function EditCVPage() {
     try {
       setSaving(true)
       
-      // Update CV title
-      await updateCV(cv.id, { title: cvTitle })
+      // Update CV title and summary
+      await updateCV(cv.id, { 
+        title: cvTitle,
+        summary: cvSummary || null,
+      })
 
       // Update target position if it exists
       if (cv.target_position) {
@@ -429,27 +423,6 @@ export default function EditCVPage() {
     }
   }
 
-  const handleExportPDF = async () => {
-    try {
-      setSaving(true)
-      const blob = await exportPDF(cvId)
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = `${cvTitle || "CV"}.pdf`
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
-      toast.success("PDF exported successfully")
-    } catch (error) {
-      toast.error("Failed to export PDF")
-      console.error(error)
-    } finally {
-      setSaving(false)
-    }
-  }
-
   const groupedSections = categoryOrder.reduce((acc, category) => {
     acc[category] = sections.filter((section) => section.type === category)
     return acc
@@ -493,6 +466,22 @@ export default function EditCVPage() {
               value={cvTitle}
               onChange={(e) => setCVTitle(e.target.value)}
             />
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Label>Summary</Label>
+              <span className="text-xs text-muted-foreground">(Recommended)</span>
+            </div>
+            <Textarea
+              value={cvSummary}
+              onChange={(e) => setCVSummary(e.target.value)}
+              placeholder="Write a brief professional summary highlighting your key qualifications and career objectives..."
+              className="min-h-[120px]"
+            />
+            <p className="text-xs text-muted-foreground">
+              A well-written summary helps recruiters quickly understand your value proposition. This summary will appear at the top of your CV.
+            </p>
           </div>
 
           {cv.target_position && (
@@ -998,9 +987,11 @@ export default function EditCVPage() {
               <TrendingUp className="mr-2 h-4 w-4" />
               Run ATS Score
             </Button>
-            <Button onClick={handleExportPDF} disabled={saving}>
-              <FileDown className="mr-2 h-4 w-4" />
-              Export PDF
+            <Button asChild disabled={saving}>
+              <Link href={`/cvs/${cvId}/resume`}>
+                <FileDown className="mr-2 h-4 w-4" />
+                Create PDF
+              </Link>
             </Button>
           </div>
         </CardContent>

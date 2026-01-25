@@ -51,7 +51,14 @@ export function CVCard({ cv, onDelete }: CVCardProps) {
         <CardHeader className="p-6">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
-              <CardTitle className="text-xl mb-2">{cv.title}</CardTitle>
+              <CardTitle className="text-xl mb-2">
+                <Link 
+                  href={`/cvs/${cv.id}`}
+                  className="hover:underline"
+                >
+                  {cv.title}
+                </Link>
+              </CardTitle>
               {cv.target_position && (
                 <CardDescription>
                   {cv.target_position.title}
@@ -72,13 +79,16 @@ export function CVCard({ cv, onDelete }: CVCardProps) {
           </div>
           <div className="flex gap-2">
             <Button variant="outline" className="flex-1" asChild>
-              <Link href={`/cvs/${cv.id}/edit`}>Edit</Link>
+              <Link href={`/cvs/${cv.id}`}>Edit</Link>
             </Button>
             {onDelete && (
               <Button
                 variant="destructive"
                 size="icon"
-                onClick={() => setDeleteDialogOpen(true)}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setDeleteDialogOpen(true)
+                }}
               >
                 <Trash2 className="h-4 w-4" />
                 <span className="sr-only">Delete</span>

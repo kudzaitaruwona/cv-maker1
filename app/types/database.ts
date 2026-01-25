@@ -49,6 +49,7 @@ export type CV = {
   user_id: string;
   target_position_id: string | null;
   title: string;
+  summary: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -154,7 +154,7 @@ export default function NewCVPage() {
       }
 
       toast.success("CV created successfully")
-      router.push(`/cvs/${cvId}/edit`)
+      router.push(`/cvs/${cvId}`)
     } catch (error) {
       toast.error("Failed to create CV sections")
       console.error(error)

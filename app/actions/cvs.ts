@@ -11,6 +11,61 @@ import type {
   ATSScore,
 } from "@/app/types/database";
 import type { MasterExperience, MasterBullet } from "@/app/types/database";
+import { BulletCategories } from "@/app/types/database";
+import { getProfile } from "./profile";
+import type { CompleteCVForPDF } from "@/cv-pdf-bundle/types/complete-cv";
+
+// CV Export Interface
+export interface CVData {
+  personalInfo: {
+    name: string;
+    title: string;
+    email: string;
+    phone: string;
+    location: string;
+    linkedin?: string;
+    github?: string;
+    website?: string;
+  };
+  summary: string;
+  experience: Array<{
+    title: string;
+    company: string;
+    location: string;
+    startDate: string;
+    endDate: string;
+    description: string[];
+  }>;
+  education: Array<{
+    degree: string;
+    school: string;
+    location: string;
+    startDate: string;
+    endDate: string;
+    gpa?: string;
+    details?: string;
+  }>;
+  skills: {
+    languages?: string[];
+    frameworks?: string[];
+    tools?: string[];
+    other?: string[];
+  };
+  certifications?: Array<{
+    name: string;
+    issuer?: string;
+    date?: string;
+  }>;
+  projects?: Array<{
+    title: string;
+    organization?: string;
+    location?: string;
+    startDate?: string;
+    endDate?: string;
+    description: string[];
+    link?: string;
+  }>;
+}
 
 async function getAuthedContext() {
   const supabase = await createClient();
@@ -135,6 +190,7 @@ export async function updateCV(
   updates: Partial<{
     title: string;
     target_position_id: string | null;
+    summary: string | null;
   }>
 ): Promise<CV> {
   // TODO: Implement Supabase query
@@ -525,15 +581,270 @@ export async function runATSScore(cvId: string): Promise<ATSScore> {
   throw new Error("Not implemented - placeholder function");
 }
 
-// Export PDF (placeholder)
-export async function exportPDF(cvId: string): Promise<Blob> {
-  // TODO: Implement PDF generation
-  // This would:
-  // 1. Fetch CV with sections and bullets
-  // 2. Format for PDF
-  // 3. Generate PDF using library (e.g., jsPDF, pdf-lib)
-  // 4. Return Blob for download
-  
-  // Placeholder
-  throw new Error("Not implemented - placeholder function");
+// Export CV Data in CompleteCVForPDF format (for PDF templates)
+export async function exportCVData(cvId: string): Promise<CompleteCVForPDF> {
+  const { supabase, user } = await getAuthedContext();
+
+  // Fetch CV and verify ownership
+  const cv = await getCV(cvId);
+  if (cv.user_id !== user.id) {
+    throw new Error("Access denied");
+  }
+
+  // Fetch CV sections with bullets
+  const sections = await getCVSections(cvId);
+
+  // Fetch user profile for personal info
+  const profile = await getProfile();
+  if (!profile) {
+    throw new Error("Profile not found. Please complete your profile first.");
+  }
+
+  // Format date helper - keep as ISO string for PDF templates
+  const formatDate = (date: string | null): string | null => {
+    if (!date) return null;
+    try {
+      return new Date(date).toISOString().split('T')[0]; // YYYY-MM-DD format
+    } catch {
+      return date;
+    }
+  };
+
+  // Get bullets as array with IDs and sort_order
+  const getBullets = (bullets: CVBullet[] | undefined, prefix: string): Array<{ id: string; content: string; sort_order: number }> => {
+    if (!bullets || bullets.length === 0) return [];
+    return bullets
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map((b, idx) => ({
+        id: `${prefix}-bullet-${idx}`,
+        content: b.content,
+        sort_order: b.sort_order,
+      }))
+      .filter((b) => b.content && b.content.trim().length > 0);
+  };
+
+  // Initialize PDF format structure
+  const pdfData: CompleteCVForPDF = {
+    header: {
+      full_name: `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "Your Name",
+      email: profile.email || null,
+      phone: profile.phone || null,
+      location: profile.location || null,
+      linkedin_url: profile.linkedin_url || null,
+      github_url: profile.github_url || null,
+      portfolio_url: profile.portfolio_url || null,
+    },
+    summary: cv.summary || null,
+    sections: {
+      experience: [],
+      projects: [],
+      education: [],
+      skills: [],
+      certifications: [],
+      other: [],
+    },
+    metadata: {
+      cv_title: cv.title,
+      target_job_title: cv.target_position?.title || null,
+      target_company: null,
+      generated_date: new Date().toISOString(),
+    },
+  };
+
+  // Process sections by type
+  let expIdx = 0;
+  let projIdx = 0;
+  let eduIdx = 0;
+  let certIdx = 0;
+  let skillIdx = 0;
+  const skillCategories: Record<string, { id: string; title: string; bullets: Array<{ id: string; content: string; sort_order: number }> }> = {};
+
+  for (const section of sections) {
+    const bullets = getBullets(section.bullets, section.id);
+    const location = section.location || null;
+    const startDate = formatDate(section.start_date);
+    const endDate = formatDate(section.end_date);
+
+    switch (section.type) {
+      case BulletCategories.Experience:
+        pdfData.sections.experience.push({
+          id: `exp-${expIdx}`,
+          title: section.title,
+          organization: section.organisation || null,
+          start_date: startDate,
+          end_date: endDate,
+          location: location,
+          link: section.link || null,
+          bullets: bullets,
+          sort_order: expIdx + 1,
+        });
+        expIdx++;
+        break;
+
+      case BulletCategories.Projects:
+        pdfData.sections.projects.push({
+          id: `proj-${projIdx}`,
+          title: section.title,
+          organization: section.organisation || null,
+          start_date: startDate,
+          end_date: endDate,
+          location: location,
+          link: section.link || null,
+          bullets: bullets,
+          sort_order: projIdx + 1,
+        });
+        projIdx++;
+        break;
+
+      case BulletCategories.Education:
+        pdfData.sections.education.push({
+          id: `edu-${eduIdx}`,
+          title: section.title,
+          organization: section.organisation || null,
+          start_date: startDate,
+          end_date: endDate,
+          location: location,
+          link: section.link || null,
+          bullets: bullets,
+          sort_order: eduIdx + 1,
+        });
+        eduIdx++;
+        break;
+
+      case BulletCategories.Skills:
+        // Categorize skills
+        for (const bullet of bullets) {
+          const skillLower = bullet.content.toLowerCase();
+          let category = "Other";
+          
+          if (
+            skillLower.includes("javascript") ||
+            skillLower.includes("typescript") ||
+            skillLower.includes("python") ||
+            skillLower.includes("java") ||
+            skillLower.includes("c++") ||
+            skillLower.includes("c#") ||
+            skillLower.includes("go") ||
+            skillLower.includes("rust") ||
+            skillLower.includes("ruby") ||
+            skillLower.includes("php") ||
+            skillLower.includes("swift") ||
+            skillLower.includes("kotlin") ||
+            skillLower.match(/\b(html|css|sql|r|matlab)\b/i)
+          ) {
+            category = "Languages";
+          } else if (
+            skillLower.includes("react") ||
+            skillLower.includes("vue") ||
+            skillLower.includes("angular") ||
+            skillLower.includes("next") ||
+            skillLower.includes("node") ||
+            skillLower.includes("express") ||
+            skillLower.includes("django") ||
+            skillLower.includes("flask") ||
+            skillLower.includes("spring") ||
+            skillLower.includes("laravel") ||
+            skillLower.includes("rails") ||
+            skillLower.match(/\b(\.net|asp\.net|fastapi|nestjs)\b/i)
+          ) {
+            category = "Frameworks";
+          } else if (
+            skillLower.includes("git") ||
+            skillLower.includes("docker") ||
+            skillLower.includes("kubernetes") ||
+            skillLower.includes("aws") ||
+            skillLower.includes("azure") ||
+            skillLower.includes("gcp") ||
+            skillLower.includes("jenkins") ||
+            skillLower.includes("ci/cd") ||
+            skillLower.includes("terraform") ||
+            skillLower.match(/\b(jira|confluence|figma|sketch|postman|mongodb|postgresql|mysql|redis)\b/i)
+          ) {
+            category = "Tools";
+          }
+
+          if (!skillCategories[category]) {
+            skillCategories[category] = {
+              id: `skills-${category.toLowerCase()}`,
+              title: category,
+              bullets: [],
+            };
+          }
+          skillCategories[category].bullets.push(bullet);
+        }
+        break;
+
+      case BulletCategories.Certifications:
+        pdfData.sections.certifications.push({
+          id: `cert-${certIdx}`,
+          title: section.title,
+          organization: section.organisation || null,
+          start_date: null,
+          end_date: endDate || startDate,
+          location: location,
+          link: section.link || null,
+          bullets: [],
+          sort_order: certIdx + 1,
+        });
+        certIdx++;
+        break;
+
+      case BulletCategories.Other:
+        pdfData.sections.other.push({
+          id: `other-${skillIdx}`,
+          title: section.title,
+          organization: section.organisation || null,
+          start_date: startDate,
+          end_date: endDate,
+          location: location,
+          link: section.link || null,
+          bullets: bullets,
+          sort_order: skillIdx + 1,
+        });
+        skillIdx++;
+        break;
+    }
+  }
+
+  // Convert skill categories to array format
+  const categoryOrder = ["Languages", "Frameworks", "Tools", "Other"];
+  let sortOrder = 1;
+  for (const category of categoryOrder) {
+    if (skillCategories[category]) {
+      pdfData.sections.skills.push({
+        id: skillCategories[category].id,
+        title: skillCategories[category].title,
+        organization: null,
+        start_date: null,
+        end_date: null,
+        location: null,
+        link: null,
+        bullets: skillCategories[category].bullets,
+        sort_order: sortOrder++,
+      });
+    }
+  }
+
+  // Sort sections by date (most recent first)
+  pdfData.sections.experience.sort((a, b) => {
+    const dateA = a.start_date ? new Date(a.start_date).getTime() : 0;
+    const dateB = b.start_date ? new Date(b.start_date).getTime() : 0;
+    return dateB - dateA;
+  });
+
+  pdfData.sections.projects.sort((a, b) => {
+    const dateA = a.end_date ? new Date(a.end_date).getTime() : (a.start_date ? new Date(a.start_date).getTime() : 0);
+    const dateB = b.end_date ? new Date(b.end_date).getTime() : (b.start_date ? new Date(b.start_date).getTime() : 0);
+    return dateB - dateA;
+  });
+
+  pdfData.sections.education.sort((a, b) => {
+    const dateA = a.start_date ? new Date(a.start_date).getTime() : 0;
+    const dateB = b.start_date ? new Date(b.start_date).getTime() : 0;
+    return dateB - dateA;
+  });
+
+  return pdfData;
 }
+
+
