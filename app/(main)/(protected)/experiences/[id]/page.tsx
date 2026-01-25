@@ -26,6 +26,7 @@ import {
 import type { MasterExperience, MasterBullet } from "@/app/types/database"
 import { BulletCategories } from "@/app/types/database"
 import { ArrowLeft, Plus, Save, Trash2, Loader2 } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
 
 // Categories that only need a single date (award/completion date)
 const singleDateCategories = [
@@ -57,6 +58,11 @@ export default function ExperienceDetailPage() {
   const [saving, setSaving] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
+  
+  // Batch editing state for bullets
+  const [newBullets, setNewBullets] = useState<string[]>([]) // Array of content strings for new bullets
+  const [editedBullets, setEditedBullets] = useState<Record<string, string>>({}) // id -> new content
+  const [deletedBulletIds, setDeletedBulletIds] = useState<Set<string>>(new Set()) // Set of ids to delete
   const [newBulletContent, setNewBulletContent] = useState("")
   const [showNewBullet, setShowNewBullet] = useState(false)
 
@@ -157,41 +163,113 @@ export default function ExperienceDetailPage() {
     }
   }
 
-  const handleCreateBullet = async () => {
+  // Add new bullet to pending list
+  const handleAddNewBullet = () => {
     if (!newBulletContent.trim()) return
+    setNewBullets([...newBullets, newBulletContent.trim()])
+    setNewBulletContent("")
+    setShowNewBullet(false)
+  }
 
+  // Update bullet content in local state
+  const handleUpdateBullet = (id: string, content: string) => {
+    setEditedBullets({ ...editedBullets, [id]: content })
+  }
+
+  // Mark bullet for deletion
+  const handleDeleteBullet = (id: string) => {
+    setDeletedBulletIds(new Set([...deletedBulletIds, id]))
+    // Remove from edited bullets if it was being edited
+    const newEdited = { ...editedBullets }
+    delete newEdited[id]
+    setEditedBullets(newEdited)
+  }
+
+  // Remove bullet from new bullets list
+  const handleRemoveNewBullet = (index: number) => {
+    setNewBullets(newBullets.filter((_, i) => i !== index))
+  }
+
+  // Undo deletion
+  const handleUndoDeleteBullet = (id: string) => {
+    const newDeleted = new Set(deletedBulletIds)
+    newDeleted.delete(id)
+    setDeletedBulletIds(newDeleted)
+  }
+
+  // Batch save all bullet changes
+  const handleSaveAllBullets = async () => {
     try {
-      const newBullet = await createBullet(experienceId, newBulletContent.trim())
-      setBullets([...bullets, newBullet])
-      setNewBulletContent("")
-      setShowNewBullet(false)
-      toast.success("Bullet added successfully")
+      setSaving(true)
+      
+      // Create new bullets
+      for (const content of newBullets) {
+        await createBullet(experienceId, content)
+      }
+
+      // Update edited bullets
+      for (const [id, content] of Object.entries(editedBullets)) {
+        await updateBullet(id, content)
+      }
+
+      // Delete marked bullets
+      for (const id of deletedBulletIds) {
+        await deleteBullet(id)
+      }
+
+      // Clear pending changes and reload
+      setNewBullets([])
+      setEditedBullets({})
+      setDeletedBulletIds(new Set())
+      
+      // Reload bullets from server
+      const bulletsData = await getBullets(experienceId)
+      setBullets(bulletsData)
+      
+      toast.success("All changes saved successfully")
     } catch (error) {
-      toast.error("Failed to create bullet")
+      toast.error("Failed to save changes")
       console.error(error)
+    } finally {
+      setSaving(false)
     }
   }
 
-  const handleUpdateBullet = async (id: string, content: string) => {
-    try {
-      const updated = await updateBullet(id, content)
-      setBullets(bullets.map((b) => (b.id === id ? updated : b)))
-      toast.success("Bullet updated successfully")
-    } catch (error) {
-      toast.error("Failed to update bullet")
-      console.error(error)
-    }
-  }
+  // Check if there are pending changes
+  const hasPendingBulletChanges = 
+    newBullets.length > 0 || 
+    Object.keys(editedBullets).length > 0 || 
+    deletedBulletIds.size > 0
 
-  const handleDeleteBullet = async (id: string) => {
-    try {
-      await deleteBullet(id)
-      setBullets(bullets.filter((b) => b.id !== id))
-      toast.success("Bullet deleted successfully")
-    } catch (error) {
-      toast.error("Failed to delete bullet")
-      console.error(error)
-    }
+  // Get display bullets (original + new - deleted, with edits applied)
+  const getDisplayBullets = (): Array<MasterBullet & { isNew?: boolean }> => {
+    const display: Array<MasterBullet & { isNew?: boolean }> = []
+    
+    // Add existing bullets (not deleted, with edits applied)
+    bullets.forEach((bullet) => {
+      if (!deletedBulletIds.has(bullet.id)) {
+        const editedContent = editedBullets[bullet.id]
+        display.push({
+          ...bullet,
+          content: editedContent !== undefined ? editedContent : bullet.content,
+        })
+      }
+    })
+    
+    // Add new bullets (as temporary objects)
+    newBullets.forEach((content, index) => {
+      display.push({
+        id: `new-${index}`,
+        content,
+        master_experience_id: experienceId,
+        user_id: "",
+        sort_order: bullets.length + index,
+        created_at: new Date().toISOString(),
+        isNew: true,
+      } as MasterBullet & { isNew: boolean })
+    })
+    
+    return display
   }
 
   const hasChanges = experience && (
@@ -458,13 +536,41 @@ export default function ExperienceDetailPage() {
       <Card className="rounded-xl border-2">
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Bullets</CardTitle>
-            {!showNewBullet && (
-              <Button onClick={() => setShowNewBullet(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Bullet
-              </Button>
-            )}
+            <div>
+              <CardTitle>Points</CardTitle>
+              {hasPendingBulletChanges && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  You have unsaved changes
+                </p>
+              )}
+            </div>
+            <div className="flex gap-2">
+              {hasPendingBulletChanges && (
+                <Button 
+                  onClick={handleSaveAllBullets} 
+                  disabled={saving}
+                  className="bg-primary"
+                >
+                  {saving ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="mr-2 h-4 w-4" />
+                      Save All Changes
+                    </>
+                  )}
+                </Button>
+              )}
+              {!showNewBullet && (
+                <Button onClick={() => setShowNewBullet(true)} variant="outline">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Point
+                </Button>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -473,12 +579,17 @@ export default function ExperienceDetailPage() {
               <textarea
                 value={newBulletContent}
                 onChange={(e) => setNewBulletContent(e.target.value)}
-                placeholder="Enter bullet point content..."
+                placeholder="Enter point content..."
                 className="w-full min-h-[80px] p-2 rounded-md border border-input bg-background"
                 autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                    handleAddNewBullet()
+                  }
+                }}
               />
               <div className="flex gap-2">
-                <Button size="sm" onClick={handleCreateBullet}>
+                <Button size="sm" onClick={handleAddNewBullet}>
                   Add
                 </Button>
                 <Button
@@ -492,24 +603,82 @@ export default function ExperienceDetailPage() {
                   Cancel
                 </Button>
               </div>
+              <p className="text-xs text-muted-foreground">
+                Press Cmd/Ctrl + Enter to add
+              </p>
             </div>
           )}
 
-          {bullets.length === 0 ? (
+          {getDisplayBullets().length === 0 && newBullets.length === 0 ? (
             <p className="text-muted-foreground text-center py-8">
-              No bullets yet. Add your first bullet point.
+              No points yet. Add your first point.
             </p>
           ) : (
             <div className="space-y-2">
-              {bullets.map((bullet) => (
-                <BulletItem
-                  key={bullet.id}
-                  bullet={bullet}
-                  onEdit={handleUpdateBullet}
-                  onDelete={handleDeleteBullet}
-                  showEditButtons={true}
-                />
-              ))}
+              {getDisplayBullets().map((bullet, index) => {
+                const isNew = bullet.isNew === true
+                const originalBullet = bullets.find(b => b.id === bullet.id)
+                const isEdited = !isNew && originalBullet && editedBullets[bullet.id] && editedBullets[bullet.id] !== originalBullet.content
+                const isDeleted = !isNew && deletedBulletIds.has(bullet.id)
+                
+                if (isNew) {
+                  // Calculate which new bullet index this is
+                  const nonDeletedCount = bullets.filter(b => !deletedBulletIds.has(b.id)).length
+                  const newBulletIndex = index - nonDeletedCount
+                  
+                  return (
+                    <div key={bullet.id} className="space-y-2 p-3 rounded-md border-2 border-primary/50 bg-primary/5">
+                      <div className="flex items-start gap-2">
+                        <Badge variant="secondary" className="text-xs">New</Badge>
+                        <p className="text-sm leading-relaxed flex-1">{bullet.content}</p>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive"
+                          onClick={() => handleRemoveNewBullet(newBulletIndex)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  )
+                }
+
+                if (isDeleted) {
+                  return (
+                    <div key={bullet.id} className="relative opacity-50">
+                      <div className="absolute inset-0 bg-destructive/10 border-2 border-destructive/50 rounded-md" />
+                      <div className="p-3 relative">
+                        <p className="text-sm line-through">{bullet.content}</p>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="mt-2"
+                          onClick={() => handleUndoDeleteBullet(bullet.id)}
+                        >
+                          Undo
+                        </Button>
+                      </div>
+                    </div>
+                  )
+                }
+
+                return (
+                  <div key={bullet.id} className="relative">
+                    {isEdited && (
+                      <Badge variant="secondary" className="absolute top-2 right-12 z-10 text-xs">
+                        Edited
+                      </Badge>
+                    )}
+                    <BulletItem
+                      bullet={bullet}
+                      onEdit={handleUpdateBullet}
+                      onDelete={handleDeleteBullet}
+                      showEditButtons={true}
+                    />
+                  </div>
+                )
+              })}
             </div>
           )}
         </CardContent>
