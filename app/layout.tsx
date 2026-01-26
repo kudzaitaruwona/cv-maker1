@@ -33,6 +33,11 @@ export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
   title: "Resumaide - CV & Achievement Manager",
   description: "Resumaide helps you store, organize, and export your professional achievements. Build multiple CV versions and export professional PDFs instantly.",
+  icons: {
+    icon: "/favicon.ico",
+    shortcut: "/favicon.ico",
+    apple: "/favicon.ico",
+  },
 };
 
 const geistSans = Geist({
